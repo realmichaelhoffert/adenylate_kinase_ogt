@@ -1,5 +1,7 @@
 # adenylate_kinase_ogt
 
+## Installation
+
 ## Repo
 * `notebooks/` : current analysis code
 * `scripts/` : helper scripts
