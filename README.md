@@ -1,7 +1,9 @@
 # adenylate_kinase_ogt
 
 ## Installation
-
+Follow the instructions here:
+https://git.embl.de/grp-kosinski/alphafold_howto/-/tree/main
+Also install `ambertools` and `nglview` using the conda-forge channel. You can also install seaborn. If importing doesn't work, downgrading numpy to 1.23.5 fixed this problem for me.
 ## Repo
 * `notebooks/` : current analysis code
 * `scripts/` : helper scripts
