@@ -8,6 +8,28 @@ Also install `ambertools` and `nglview` using the conda-forge channel. You can a
 * `notebooks/` : current analysis code
 * `scripts/` : helper scripts
 
+## Server connection and data running
+Log in
+```
+ssh miho1832@login.rc.colorado.edu
+```
+Launch compile node
+```
+acompile
+```
+Load modules
+```
+module load cuda/11.8
+module load cudnn/8.6
+module load mambaforge/23.1.0-1
+mamba activate adenylate_kinase_ogt
+```
+Navigate to working dir `/projects/miho1832/`
+Submit job
+```
+
+```
+
 ## Current workflow 
 1. Get GTDB genomes with OGTs from Melnikov dataset.
 2. Get highest quality match to PF00406, "adenylate kinase" from each genome using existing mapping of PFam to GTDB r207.
