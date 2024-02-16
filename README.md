@@ -17,19 +17,61 @@ Launch compile node
 ```
 acompile
 ```
-Load modules
+Navigate to working directory `/projects/miho1832/adenylate_kinase_ogt/data/`  
+Directory structure:
 ```
+/outputs/[protein].tgz # compressed colabfold outputs
+/adks/ # adk proteins
+```
+Run slurm script `colabfold_script.sh`
+```
+#!/bin/bash
+
+#A typical runs takes couple of hours but may be much longer
+#SBATCH --time=03:00:00
+#SBATCH --job-name=colabfold_adks
+
+#log files:
+#SBATCH -e AF_%x_%j_err.txt
+#SBATCH -o AF_%x_%j_out.txt
+
+#SBATCH --qos=normal
+
+#SBATCH --partition=aa100
+#SBATCH --gres=gpu:1
+#SBATCH --ntasks=1
+#SBATCH --mem=16000
+# current array at 101
+
+FILES=(adks/*.faa)
+FILE=${FILES[$SLURM_ARRAY_TASK_ID]}
+
+echo "At task: ${SLURM_ARRAY_TASK_ID}"
+echo ${FILE}
+OUTFILE=$(basename ${FILE} _adk.faa)
+echo ${OUTFILE}
+
+module purge
 module load cuda/11.8
 module load cudnn/8.6
 module load mambaforge/23.1.0-1
-mamba activate adenylate_kinase_ogt
-```
-Navigate to working dir `/projects/miho1832/`
-Submit job
-```
 
-```
+mamba activate /projects/miho1832/miniforge3/envs/adenylate_kinase_ogt
 
+cd /projects/miho1832/adenylate_kinase_ogt/data/
+
+mkdir ./outputs/${OUTFILE}_temp
+cp ./folded/closed/* ./outputs/${OUTFILE}_temp/
+srun colabfold_batch ./adks/${OUTFILE}_adk.faa ./outputs/${OUTFILE}_closed \
+--templates --custom-template-path ./outputs/${OUTFILE}_temp/ \
+--overwrite-existing-results --amber --num-relax 5 --model-order 1,2,3,4,5 \
+--random-seed 1040 --num-recycle 7 --save-recycles --data ./outputs/${OUTFILE}_temp --use-gpu-relax
+rm -r ./outputs/${OUTFILE}_temp/
+cd outputs/
+tar -czf ${OUTFILE}_closed.tgz ${OUTFILE}_closed
+rm -r ${OUTFILE}_closed
+cd ..
+```
 ## Current workflow 
 1. Get GTDB genomes with OGTs from Melnikov dataset.
 2. Get highest quality match to PF00406, "adenylate kinase" from each genome using existing mapping of PFam to GTDB r207.
