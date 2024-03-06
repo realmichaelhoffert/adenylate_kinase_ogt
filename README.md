@@ -72,6 +72,22 @@ tar -czf ${OUTFILE}_closed.tgz ${OUTFILE}_closed
 rm -r ${OUTFILE}_closed
 cd ..
 ```
+Move outputs to microbe from alpine (run on microbe)
+```
+rsync -r miho1832@login.rc.colorado.edu:/projects/miho1832/adenylate_kinase_ogt/data/outputs/ ./
+```
+Unpack outputs
+```
+ls outputs/ | sed 's/_closed.*//' > inds_unpack.txt
+rm file_names.txt
+touch file_names.txt
+mkdir test_structures2
+# from parent directory of outputs
+parallel -j 12 './unpack_structures.sh {}' :::: inds_unpack.txt
+```
+Run code in python notebooks
+
+
 ## Current workflow 
 1. Get GTDB genomes with OGTs from Melnikov dataset.
 2. Get highest quality match to PF00406, "adenylate kinase" from each genome using existing mapping of PFam to GTDB r207.
