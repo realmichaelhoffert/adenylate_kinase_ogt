@@ -1,5 +1,6 @@
 name: adenylate_kinase_ogt
 channels:
+  - salilab
   - conda-forge
   - bioconda
   - defaults
@@ -20,6 +21,7 @@ dependencies:
   - beautifulsoup4=4.12.2=pyha770c72_0
   - bleach=6.1.0=pyhd8ed1ab_0
   - blosc=1.21.5=h0f2a231_0
+  - boost-cpp=1.82.0=h44aadfe_6
   - brotli=1.1.0=hd590300_1
   - brotli-bin=1.1.0=hd590300_1
   - brotli-python=1.1.0=py310hc6cd4ac_1
@@ -40,6 +42,7 @@ dependencies:
   - debugpy=1.8.0=py310hc6cd4ac_1
   - decorator=5.1.1=pyhd8ed1ab_0
   - defusedxml=0.7.1=pyhd8ed1ab_0
+  - dssp=3.0.0=h3fd9d12_4
   - entrypoints=0.4=pyhd8ed1ab_0
   - exceptiongroup=1.2.0=pyhd8ed1ab_2
   - executing=2.0.1=pyhd8ed1ab_0
@@ -53,6 +56,7 @@ dependencies:
   - hdf4=4.2.15=h2a13503_7
   - hdf5=1.14.3=nompi_h4f84152_100
   - hhsuite=3.3.0=py310pl5321h068649b_9
+  - hmmer=3.4=hdbdd923_0
   - icu=73.2=h59595ed_0
   - idna=3.6=pyhd8ed1ab_0
   - importlib_metadata=7.0.1=hd8ed1ab_0
@@ -89,6 +93,8 @@ dependencies:
   - libaec=1.1.2=h59595ed_1
   - libblas=3.9.0=20_linux64_openblas
   - libboost=1.82.0=h6fcfa73_6
+  - libboost-devel=1.82.0=h00ab1b0_6
+  - libboost-headers=1.82.0=ha770c72_6
   - libbrotlicommon=1.1.0=hd590300_1
   - libbrotlidec=1.1.0=hd590300_1
   - libbrotlienc=1.1.0=hd590300_1
