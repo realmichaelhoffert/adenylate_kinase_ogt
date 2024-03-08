@@ -7,6 +7,9 @@ Also install `ambertools` and `nglview` using the conda-forge channel. You can a
 ## Repo
 * `notebooks/` : current analysis code
 * `scripts/` : helper scripts
+* `data/` : project-relevant data
+  * `metric_tables/` : structural metrics, genome to temperature table, etc.
+  * 
 
 ## Server connection and data running
 Log in
@@ -85,7 +88,15 @@ mkdir test_structures2
 # from parent directory of outputs
 parallel -j 12 './unpack_structures.sh {}' :::: inds_unpack.txt
 ```
-Run code in python notebooks
+Run Biopython code
+```
+python mp_metrics.py [dir to save processed structures] [file to save complete table]
+```
+Run Rosetta code
+```
+parallel -j 12 './run_rosetta.sh {}' :::: inds_rosetta.txt
+```
+`inds_rosetta.txt` and `inds_unpack.txt` are lists of the genome ids, one per line, in a text file. Unfortunately the code is crappy and runs with hard coded file paths. So it must be run from `data/`
 
 
 ## Current workflow 
