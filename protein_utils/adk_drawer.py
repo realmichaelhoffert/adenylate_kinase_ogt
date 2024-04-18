@@ -12,6 +12,8 @@ from pdb_getter import collapse_and_label
 
 from collections import Counter
 
+import numpy as np
+
 # expected structure
 # N - A3 - H1 - A5 - H2 - H3 - H4 - A4 - H5 - A2 - H6 - B1 - B2 - C1 - C2 - C3 - H7 - A1 - H8
 # C - C  - C  - C  - N  - N  - N  - C  - C  - C  - L  - L  - L  - L  - L  - L  - C  - C  - C
@@ -95,3 +97,105 @@ def draw_adk(pdb, color_ss=[], color_domains=[], ss='', seqfile=None):
     
     w.center()
     return w
+
+
+def nw(x, y, match = 1, mismatch = 1, gap = 1):
+    nx = len(x)
+    ny = len(y)
+    # Optimal score at each possible pair of characters.
+    F = np.zeros((nx + 1, ny + 1))
+    F[:,0] = np.linspace(0, -nx * gap, nx + 1)
+    F[0,:] = np.linspace(0, -ny * gap, ny + 1)
+    # Pointers to trace through an optimal aligment.
+    P = np.zeros((nx + 1, ny + 1))
+    P[:,0] = 3
+    P[0,:] = 4
+    # Temporary scores.
+    t = np.zeros(3)
+    for i in range(nx):
+        for j in range(ny):
+            if x[i] == y[j]:
+                t[0] = F[i,j] + match
+            else:
+                t[0] = F[i,j] - mismatch
+            t[1] = F[i,j+1] - gap
+            t[2] = F[i+1,j] - gap
+            tmax = np.max(t)
+            F[i+1,j+1] = tmax
+            if t[0] == tmax:
+                P[i+1,j+1] += 2
+            if t[1] == tmax:
+                P[i+1,j+1] += 3
+            if t[2] == tmax:
+                P[i+1,j+1] += 4
+    # Trace through an optimal alignment.
+    i = nx
+    j = ny
+    rx = []
+    ry = []
+    while i > 0 or j > 0:
+        if P[i,j] in [2, 5, 6, 9]:
+            rx.append(x[i-1])
+            ry.append(y[j-1])
+            i -= 1
+            j -= 1
+        elif P[i,j] in [3, 5, 7, 9]:
+            rx.append(x[i-1])
+            ry.append('-')
+            i -= 1
+        elif P[i,j] in [4, 6, 7, 9]:
+            rx.append('-')
+            ry.append(y[j-1])
+            j -= 1
+    # Reverse the strings.
+    rx = ''.join(rx)[::-1]
+    ry = ''.join(ry)[::-1]
+    return '\n'.join([rx, ry])
+
+
+def compute_domains(ss, m=1, mm=1, g=1, verbose=False):
+
+    ## Test filtering on domain structure
+    # old
+    # 'CCCCNNNCCCLLLLLLCCC'
+    # 'EHEHHHEHEHEEEEEEHEH'
+    if len(ss) > 200:
+        canonical_dom =        'CCPCCCNNNNNCCCCCCCCLLLLLLLLLLLLLLCCCCCC'
+        canonical_structures = 'LELHLEHLHLHLLELHLELHLELELELELELELHLELHL'
+    else:
+        canonical_dom =        'CCPCCCNNNNNCCCCCCCCLLLLLCCCCCC'
+        canonical_structures = 'LELHLEHLHLHLLELHLELHLELLHLELHL'
+        
+    structure = ''.join([item[0] for key, item in ss_to_domains(ss)[0].items()])
+    if verbose:
+        print(structure)
+        print(len(structure))
+    alignment = nw(structure, canonical_structures, match=m, mismatch=mm, gap=g)
+    text = alignment.split('\n')[1]
+    new_can_dom = canonical_dom
+    for ind in [n for n in range(len(text)) if text.find('-', n) == n]:
+        new_can_dom = new_can_dom[:ind] + new_can_dom[ind-1] + new_can_dom[ind:]
+
+    if verbose:
+        print('\n'.join([alignment, canonical_dom, new_can_dom]))
+    
+    ss2dom = list(zip(alignment.split('\n')[0], new_can_dom))
+
+    temp_dict = {}
+    map_dict = {}
+    for item in [i for i in ss2dom if not '-' in i[0]]:
+        if item[0] in temp_dict.keys():
+            temp_dict[item[0]] += 1
+        else:
+            temp_dict[item[0]] = 1
+    
+        map_dict[f'{item[0]}{temp_dict[item[0]]}'] = item[1]
+
+    r2s = ss_to_domains(ss)[0]
+
+    structure_loc = []
+    for key, item in r2s.items():
+        indeces = [int(k) for k in key.split('-')]
+        structure_loc += [map_dict[item]] * len(list(range(indeces[0], indeces[1])))
+
+    return structure_loc

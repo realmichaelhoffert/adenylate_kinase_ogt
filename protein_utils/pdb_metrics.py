@@ -29,7 +29,7 @@ def process_structure(structure_file : str, uid : str, write_processed = False, 
     res_to_remove = []
     counter = 0
     res = queryable_protein[counter]
-    while res['CA'].get_bfactor() < 70 and counter < 30:
+    while res['CA'].get_bfactor() < 70: # and counter < 80:
         res_to_remove.append(res)
         counter += 1
         res = queryable_protein[counter]
@@ -37,7 +37,7 @@ def process_structure(structure_file : str, uid : str, write_processed = False, 
     # iterate in other direction
     counter = 1
     res = queryable_protein[-counter]
-    while res['CA'].get_bfactor() < 70 and counter < 30:
+    while res['CA'].get_bfactor() < 70: # and counter < 80:
         res_to_remove.append(res)
         counter += 1
         res = queryable_protein[-counter]

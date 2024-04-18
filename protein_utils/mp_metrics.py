@@ -7,7 +7,7 @@ import pandas as pd
 
 sys.path.append('/data/mhoffert/fiererlab/adenylate_kinase_ogt/protein_utils/')
 
-structures = glob.glob('/data/mhoffert/fiererlab/adenylate_kinase_ogt/data/test_structures2/*.pdb')
+structures = glob.glob('/data/mhoffert/fiererlab/adenylate_kinase_ogt/data/test_structures/*.pdb')
 inputs = [(f, f.split('/')[-1].split('_closed')[0], True, sys.argv[1]) for f in structures]
 
 from multiprocessing import Pool, freeze_support
