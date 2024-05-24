@@ -1,6 +1,14 @@
 *.ipynb_checkpoints*
-*.pyc
+*__pycache__*
 
+*data/20240122*
+*data/environment*
+*data/genomes*
+*data/inds*
+*data/processed_structures*
+*data/test_structures*
+*data/rosetta_inputs.txt*
+*data/tmp*
 *data/outputs/*
 *data/ogt/*
 *data/pdb*
