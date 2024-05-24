@@ -6,7 +6,7 @@ from Bio.PDB import SASA
 
 import pandas as pd
 
-def process_structure(structure_file : str, uid : str, write_processed = False, savepath=''):
+def process_structure(structure_file : str, uid : str, write_processed = False, savepath='', calculate_local=False):
     io=Bio.PDB.PDBIO()
     parser = Bio.PDB.PDBParser()
     # get structure
@@ -63,8 +63,8 @@ def process_structure(structure_file : str, uid : str, write_processed = False, 
     
     # set residue positions as indices for df
     temp_df['Position'] = residues_range
-    temp_df = temp_df.set_index('Position')
-
+    temp_df = temp_df.set_index('Position')        
+        
     for chain in Bio.PDB.Selection.unfold_entities(list(queryable_protein), 'C'):
             if chain.id == 'A':
                 temp_df = temp_df.copy()
@@ -87,10 +87,11 @@ def process_structure(structure_file : str, uid : str, write_processed = False, 
                 sr.compute(struct[0], level="R") # note that this omits burial due to bound ligands or contacts with other chains    
                 temp_df['SASA'] = temp_df['Position'].map(lambda pos: chain[pos].sasa if not pos in residues_absent else np.NaN)
                 
-                temp_df_m = temp_df.mean(numeric_only=True)
+                #temp_df_m = temp_df.mean(numeric_only=True)
                             
-                temp_df_m['uid'] = uid
+                #temp_df_m['uid'] = uid
                 # df_collector.append(temp_df_m)
+                temp_df['uid'] = uid
                 
                 # save files with trimmed termini for analysis with rosetta
                 if write_processed:
@@ -104,4 +105,5 @@ def process_structure(structure_file : str, uid : str, write_processed = False, 
                     io.set_structure(struct)
                     io.save(os.path.join(savepath, filename))
 
-    return temp_df_m
+    return temp_df
+    #return temp_df_m

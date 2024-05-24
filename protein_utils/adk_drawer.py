@@ -61,7 +61,7 @@ def ss_to_domains(ss):
         
     return struct2res, structure_annot
 
-def draw_adk(pdb, color_ss=[], color_domains=[], ss='', seqfile=None):
+def draw_adk(pdb, color_ss={}, color_domains={}, ss='', seqfile=None):
     '''
     pdb: filepath to pdb file
     color_ss: cmap of secondary structure colors, if desired
