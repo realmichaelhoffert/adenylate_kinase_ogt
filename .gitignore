@@ -1,4 +1,15 @@
 *.ipynb_checkpoints*
+*.pyc
+
+*data/outputs/*
+*data/ogt/*
+*data/pdb*
+*data/*.sh
+*data/rosetta_out/*
+*data/fold*
+*data/adks/*
+*data/PF05191/*
+*data/clustering/*
 
 # IPython
 profile_default/
