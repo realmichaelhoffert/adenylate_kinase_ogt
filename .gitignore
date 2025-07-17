@@ -1,6 +1,7 @@
 *.ipynb_checkpoints*
 *__pycache__*
 
+*data/validation_data*
 *data/20240122*
 *data/environment*
 *data/genomes*
