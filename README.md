@@ -9,9 +9,28 @@ Also install `ambertools` and `nglview` using the conda-forge channel. You can a
 * `scripts/` : helper scripts
 * `data/` : project-relevant data
   * `metric_tables/` : structural metrics, genome to temperature table, etc.
-  * 
+  * `figures` : miscellaneous figures
+ 
+## Data flow
 
-## Server connection and data running
+Diagram is a work in progress
+
+## Notebook outline
+1. `notebooks/00_adenylate_kinase.ipynb`
+   * Assess OGT dataset (Gosha a.k.a Melnikov)
+   * Find and save sequences for ADKs from each genome in Melnikov
+   * Old code to classify PDB blast hits for ADKs into open / closed conformations
+2. `notebooks/01_compile_data.ipynb`
+   * Code for assembling metric tables / running Rosetta and Biopython-based structural feature calculation
+3. `notebooks/02_filtering.ipynb`
+   * Filtering structures
+4. `notebooks/03_plots_and_PL.ipynb`
+   * Plots of structural features vs temperature
+   * Miscellaneous attempts to predict temperature from structural
+   * Canonical (current, best, manuscript-ready (????) ) structural predictive model
+
+
+## Compilation of structural features
 Log in
 ```
 ssh miho1832@login.rc.colorado.edu
