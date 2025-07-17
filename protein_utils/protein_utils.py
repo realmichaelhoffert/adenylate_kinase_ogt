@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
-import subprocess
+# import subprocess
+
 
 
 pfam_table_columns = ['target_name','target_accession','query_name','query_accession', 
