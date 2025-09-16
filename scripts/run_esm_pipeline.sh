@@ -72,8 +72,8 @@ run_prodigal() {
     genome="$1"
 
     # Strip directory and extensions: .fasta, .fa, .fasta.gz, .fa.gz
-    filename=$(basename "$genome")
-    base="${filename%.fasta}"
+    # filename=$(basename "$genome")
+    base="${genome%.fasta}"
     base="${base%.fa}"
     base="${base%.fasta.gz}"
     base="${base%.fa.gz}"
@@ -84,10 +84,13 @@ run_prodigal() {
         genome="/tmp/${base}_temp.fa"
     fi
 
-    prodigal -i "$genome" -c \
+    seqtk seq -A -L 300 "$genome" > "${base}_filtered.fasta"
+
+    prodigal -i "${base}_filtered.fasta" -c \
              -a "${base}_proteins.faa" \
              -d "${base}_proteins.fna" \
-             -o "${base}_prodigal_output.gbk"
+             -o "${base}_prodigal_output.gbk" \
+             -p meta
 
     # Optionally run hmmsearch
     if [[ -n "$HMM_MODEL" ]]; then

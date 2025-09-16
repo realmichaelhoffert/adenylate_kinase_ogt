@@ -1,6 +1,6 @@
 *.ipynb_checkpoints*
 *__pycache__*
-
+*base_api_key.txt*
 *data/validation_data*
 *data/20240122*
 *data/environment*
