@@ -14,6 +14,12 @@ from sklearn.preprocessing import StandardScaler
 from Bio.Seq import Seq as Seq
 from Bio import SeqIO as SeqIO
 
+# plotting
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import numpy as np
+
 def reload_model(path : str) -> dict:
     """
     Code to reload models saved as pickles
@@ -64,3 +70,43 @@ def scale_ogts(msa_dataset : MSADataset, scaler : StandardScaler = None) -> MSAD
     scaled_ogts = [i[0] for i in _scaler.transform(ogts)]
     scaled_msa_dataset = [(msa_dataset[i][0], msa_dataset[i][1], scaled_ogts[i]) for i in range(len(msa_dataset))]
     return scaled_msa_dataset, _scaler
+
+
+def plot_performance(y_true, y_pred, title, show=False, save_loc=None, colors=None, label=None):
+    """
+    Plot performance of a given model
+    """
+    
+    fig, ax  = plt.subplots(figsize=(4, 4))
+    sc = plt.scatter(y_true, y_pred, 
+                     alpha=0.7, edgecolors='w')
+    # plt.colorbar(sc, label='Normalized OGT')
+
+    r2 = r2_score(y_true, y_pred)
+    mse = np.sqrt(mean_squared_error(y_true, y_pred))
+        
+    ax.set_title(f"{title}\n$R^{2}$: {r2:.2f} | RMSE: {mse:.2f}")
+    # plt.title(title)
+    plt.tick_params(labelsize=14, axis='both')
+    plt.xlabel(f"True", fontsize=16)
+    plt.ylabel(f"Predicted", fontsize=16)
+    sns.despine()
+    ax.set_aspect('equal')
+    
+    _min = np.floor(np.min([np.min(y_true), np.min(y_pred)]))
+    print(_min, _min-(_min*.5))
+    _max = np.floor(np.max([np.max(y_true), np.max(y_pred)]))
+    _range = np.abs(_max-_min)
+    ax.set_ylim(_min-(_range*.1),
+                _max+(_range*.1))
+    ax.set_xlim(_min-(_range*.1),
+            _max+(_range*.1))
+    
+    plt.plot((_min+0.5, _max-0.5), (_min+0.5, _max-0.5), 'k--', label='x=y')
+    if save_loc is not None:
+        plt.savefig(save_loc, bbox_inches='tight')
+    if show:
+        plt.show()
+
+    plt.cla()
+    plt.close()
