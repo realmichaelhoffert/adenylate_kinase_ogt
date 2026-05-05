@@ -1,0 +1,49 @@
+<ROSETTASCRIPTS>
+    <SCOREFXNS>
+        <ScoreFunction name="ref2015" weights="ref2015"/>
+    </SCOREFXNS>
+    <RESIDUE_SELECTORS>
+    </RESIDUE_SELECTORS>
+    <TASKOPERATIONS>
+    </TASKOPERATIONS>
+    <SIMPLE_METRICS>
+        <SasaMetric name="sasa" custom_type="" sasa_metric_mode="all_sasa" />
+        <SasaMetric name="sasa_polar"  custom_type="polar" sasa_metric_mode="polar_sasa" />
+        <SasaMetric name="sasa_nonpolar"  custom_type="nonpolar" sasa_metric_mode="hydrophobic_sasa" />
+        <SecondaryStructureMetric name="ss"/>
+        <HbondMetric name="hbonds_total" include_self="false" />
+        <PeptideInternalHbondsMetric name="hbonds_check" custom_type="" exclusion_distance="0" hbond_energy_cutoff="-0.25"
+            backbone_backbone="true" backbone_sidechain="true" sidechain_sidechain="true" />
+        <PeptideInternalHbondsMetric name="hbonds_bb" custom_type="bb" exclusion_distance="0" hbond_energy_cutoff="-0.25"
+            backbone_backbone="true" backbone_sidechain="false" sidechain_sidechain="false" />
+        <PeptideInternalHbondsMetric name="hbonds_bbsc"  custom_type="bbsc" exclusion_distance="0" hbond_energy_cutoff="-0.25"
+            backbone_backbone="false" backbone_sidechain="true" sidechain_sidechain="false" />
+        <PeptideInternalHbondsMetric name="hbonds_sc"  custom_type="sc" exclusion_distance="0" hbond_energy_cutoff="-0.25"
+            backbone_backbone="false" backbone_sidechain="false" sidechain_sidechain="true" />
+        <SidechainNeighborCountMetric name="sc_nbrs" custom_type=""/>
+        <ResidueSummaryMetric name="avg_sc_nbrs" custom_type="avg_sc_nbrs" metric="sc_nbrs" action="mean" />
+        </SIMPLE_METRICS>
+    <FILTERS>
+        <CavityVolume name="cav_vol" />
+        <PackStat name="packstat" threshold="0" chain="0" repeats="1"/>
+        <AverageDegree name="avg_deg_4_5" threshold="0" distance_threshold="4.5"/>
+        <AverageDegree name="avg_deg_8" threshold="0" distance_threshold="8"/>
+        <AtomicContactCount name="total_cc_contacts" partition="none" distance="4.5"/>
+    </FILTERS>
+    <MOVERS>
+        <ScoreMover name="score" scorefxn="ref2015"/>
+        <RunSimpleMetrics name="run_metrics" metrics="sasa,sasa_polar,sasa_nonpolar,ss,hbonds_check,hbonds_bb,hbonds_bbsc,hbonds_sc,avg_sc_nbrs"
+            prefix="" suffix="" override="false" >
+        </RunSimpleMetrics>
+    </MOVERS>
+    <PROTOCOLS>
+		<Add mover_name="score" />
+        <Add filter_name="cav_vol" />
+        <Add filter_name="packstat" />
+        <Add filter_name="avg_deg_4_5" />
+        <Add filter_name="avg_deg_8" />
+        <Add filter_name="total_cc_contacts" />
+		<Add mover_name="run_metrics" />
+    </PROTOCOLS>
+    <OUTPUT />
+</ROSETTASCRIPTS>
