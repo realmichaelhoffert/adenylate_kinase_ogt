@@ -9,6 +9,8 @@ import pickle
 
 # ML utils
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score
+from sklearn.neighbors import KernelDensity
 
 # Sequence IO
 from Bio.Seq import Seq as Seq
@@ -17,8 +19,11 @@ from Bio import SeqIO as SeqIO
 # plotting
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 import numpy as np
+
+from scipy.stats import spearmanr
+
+import copy
 
 def reload_model(path : str) -> dict:
     """
@@ -29,11 +34,39 @@ def reload_model(path : str) -> dict:
         model_data = pickle.load(handle)
     return model_data
 
+
+def assess_model(y_true, y_pred):
+    '''
+    Run model assessment
+    '''
+    r2 = r2_score(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    _spearmanr = spearmanr(y_true, y_pred)[0]
+    return '$R^{2}$=' + f'{r2:.2f}|RMSE={rmse:.2f}|SpR={_spearmanr:.2f}', (r2, rmse, spearmanr)
+
 def unscale_ogts(ogt_list, scaler : StandardScaler) -> list:
     """
     function to unscale data given a scaler
     """
     return scaler.inverse_transform(np.array(ogt_list).reshape(1, -1))[0]
+
+
+# function to get weights based on y variable density
+def compute_gaussian_weights(_y):
+    # Normalize the target variable to compute KDE
+    scaler = StandardScaler()
+    y_scaled = scaler.fit_transform(_y.reshape(-1, 1))
+    
+    # Estimate density of target variable using KDE
+    kde = KernelDensity(kernel='gaussian', bandwidth=0.4)
+    kde.fit(y_scaled)
+    log_density = kde.score_samples(y_scaled)
+    density = np.exp(log_density)
+    
+    # Compute weights as inverse of density
+    weights = 1 / density
+
+    return weights
 
 
 MSADataset = list[tuple]

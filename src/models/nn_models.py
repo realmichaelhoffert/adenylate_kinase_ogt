@@ -11,11 +11,11 @@ from torch.nn import HuberLoss, MSELoss
 # ESM
 import esm
 
-
+import numpy as np
 
 class MLPRegressor(nn.Module):
     def __init__(self, input_size=768, hidden_size=256):
-        super(MLPRegressor, self).__init__()
+        super().__init__()
         self.network = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.ReLU(),
@@ -48,7 +48,7 @@ class MLPRegressor(nn.Module):
 
 class AttentionRegressor(nn.Module):
     def __init__(self, input_size=768, hidden_size=256):
-        super(AttentionRegressor, self).__init__()
+        super().__init__()
         
         # attention:
         # This will operate on the last dimension (768) 

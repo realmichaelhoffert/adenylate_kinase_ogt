@@ -4,6 +4,7 @@ import string
 
 # python libs
 import pickle
+import random
 
 # ML utils
 from sklearn.preprocessing import StandardScaler
@@ -16,6 +17,9 @@ from Bio import SeqIO as SeqIO
 import esm as esm
 import torch as torch
 import numpy as np
+
+# other
+from tqdm import tqdm
 
 MSADataset = list[tuple]
 def get_random_context(msa_dataset : MSADataset, 
