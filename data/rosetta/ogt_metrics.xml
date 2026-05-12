@@ -3,6 +3,7 @@
         <ScoreFunction name="ref2015" weights="ref2015"/>
     </SCOREFXNS>
     <RESIDUE_SELECTORS>
+        <True name="all_residues"/>
     </RESIDUE_SELECTORS>
     <TASKOPERATIONS>
     </TASKOPERATIONS>
@@ -29,6 +30,13 @@
         <AverageDegree name="avg_deg_4_5" threshold="0" distance_threshold="4.5"/>
         <AverageDegree name="avg_deg_8" threshold="0" distance_threshold="8"/>
         <AtomicContactCount name="total_cc_contacts" partition="none" distance="4.5"/>
+        <BuriedSurfaceArea name="calc_bsa"
+             select_only_FAMILYVW="false" 
+             filter_out_low="true"
+             cutoff_buried_surface_area="500" 
+             atom_mode="all_atoms"
+             residue_selector="all_residues" 
+             confidence="0.0"/>
     </FILTERS>
     <MOVERS>
         <ScoreMover name="score" scorefxn="ref2015"/>
@@ -44,6 +52,7 @@
         <Add filter_name="avg_deg_8" />
         <Add filter_name="total_cc_contacts" />
 		<Add mover_name="run_metrics" />
+        <Add filter="calc_bsa"/>
     </PROTOCOLS>
     <OUTPUT />
 </ROSETTASCRIPTS>
