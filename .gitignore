@@ -19,6 +19,7 @@
 *data/adks/*
 *data/PF05191/*
 *data/clustering/*
+*data/seqkit*
 
 # IPython
 profile_default/
