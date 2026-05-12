@@ -8,6 +8,18 @@
     <TASKOPERATIONS>
     </TASKOPERATIONS>
     <SIMPLE_METRICS>
+        <!-- <PerResidueSasaMetric name="per_res_sasa" 
+            residue_selector="all_residues" 
+            mode="all_sasa"
+            custom_type=""/>
+        <PerResidueSasaMetric name="per_res_sasa_polar" 
+            residue_selector="all_residues" 
+            custom_type="polar"
+            mode="polar_sasa"/>
+        <PerResidueSasaMetric name="per_res_sasa_nonpolar" 
+            residue_selector="all_residues" 
+            custom_type="nonpolar"
+            mode="hydrophobic_sasa"/> -->
         <SasaMetric name="sasa" custom_type="" sasa_metric_mode="all_sasa" />
         <SasaMetric name="sasa_polar"  custom_type="polar" sasa_metric_mode="polar_sasa" />
         <SasaMetric name="sasa_nonpolar"  custom_type="nonpolar" sasa_metric_mode="hydrophobic_sasa" />
@@ -40,19 +52,21 @@
     </FILTERS>
     <MOVERS>
         <ScoreMover name="score" scorefxn="ref2015"/>
-        <RunSimpleMetrics name="run_metrics" metrics="sasa,sasa_polar,sasa_nonpolar,ss,hbonds_check,hbonds_bb,hbonds_bbsc,hbonds_sc,avg_sc_nbrs"
+        <!-- metrics="per_res_sasa,per_res_sasa_polar,sasa,sasa_polar,sasa_nonpolar,ss,hbonds_check,hbonds_bb,hbonds_bbsc,hbonds_sc,avg_sc_nbrs" -->
+        <RunSimpleMetrics name="run_metrics" 
+            metrics="sasa,sasa_polar,sasa_nonpolar,ss,hbonds_check,hbonds_bb,hbonds_bbsc,hbonds_sc,avg_sc_nbrs"
             prefix="" suffix="" override="false" >
         </RunSimpleMetrics>
     </MOVERS>
     <PROTOCOLS>
 		<Add mover_name="score" />
+        <Add mover_name="run_metrics" />
         <Add filter_name="cav_vol" />
         <Add filter_name="packstat" />
         <Add filter_name="avg_deg_4_5" />
         <Add filter_name="avg_deg_8" />
         <Add filter_name="total_cc_contacts" />
-		<Add mover_name="run_metrics" />
-        <Add filter="calc_bsa"/>
+        <Add filter_name="calc_bsa"/>
     </PROTOCOLS>
     <OUTPUT />
 </ROSETTASCRIPTS>
