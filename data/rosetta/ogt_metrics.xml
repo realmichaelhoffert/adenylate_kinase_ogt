@@ -42,8 +42,15 @@
         <AverageDegree name="avg_deg_4_5" threshold="0" distance_threshold="4.5"/>
         <AverageDegree name="avg_deg_8" threshold="0" distance_threshold="8"/>
         <AtomicContactCount name="total_cc_contacts" partition="none" distance="4.5"/>
-        <BuriedSurfaceArea name="calc_bsa"
+        <BuriedSurfaceArea name="calc_bsa_total"
              select_only_FAMILYVW="false" 
+             filter_out_low="true"
+             cutoff_buried_surface_area="500" 
+             atom_mode="all_atoms"
+             residue_selector="all_residues" 
+             confidence="0.0"/>
+        <BuriedSurfaceArea name="calc_bsa_apolar"
+             select_only_FAMILYVW="true" 
              filter_out_low="true"
              cutoff_buried_surface_area="500" 
              atom_mode="all_atoms"
@@ -66,7 +73,8 @@
         <Add filter_name="avg_deg_4_5" />
         <Add filter_name="avg_deg_8" />
         <Add filter_name="total_cc_contacts" />
-        <Add filter_name="calc_bsa"/>
+        <Add filter_name="calc_bsa_total"/>
+        <Add filter_name="calc_bsa_apolar"/>
     </PROTOCOLS>
     <OUTPUT />
 </ROSETTASCRIPTS>
