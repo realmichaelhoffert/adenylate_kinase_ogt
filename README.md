@@ -141,6 +141,12 @@ Additionally, Rosetta was used to calculate more structural metrics.
 
 Run Rosetta code
 ```
+ls processed_structures/ | sed 's/\.pdb//' > new_rosetta_inputs.txt
+# from data/
+parallel -j 20 './../scripts/run_rosetta.sh -i {} -x ./rosetta/ogt_metrics.xml -o ./rosetta_out/ -d ./processed_structures/' :::: ./new_rosetta_inputs.txt
+```
+
+```
 parallel -j 12 './run_rosetta.sh {}' :::: inds_rosetta.txt
 ```
 
