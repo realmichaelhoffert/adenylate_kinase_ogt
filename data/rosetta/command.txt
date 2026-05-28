@@ -1,0 +1,1 @@
+$ROSETTA_BIN/rosetta_scripts.static.linuxgccrelease -l pdbs.txt -parser:protocol *.xml -out:file:score_only rosetta_out.sc  

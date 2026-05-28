@@ -1,21 +1,24 @@
 # adenylate_kinase_ogt
 
-## Installation
+This is a repository for the code an analyses associated with the project "Predicting bacterial optimal growth temperatures using protein structural information." This project develops a model, ROSEATE, which performs **R**egression **O**n **S**ite-specific **E**mbeddings for **A**denylate **K**inase-Based **O**GT **E**stimation.
+
+## A. Installation
 Follow the instructions here:
 https://git.embl.de/grp-kosinski/alphafold_howto/-/tree/main
 Also install `ambertools` and `nglview` using the conda-forge channel. You can also install seaborn. If importing doesn't work, downgrading numpy to 1.23.5 fixed this problem for me.
-## Repo
+## B. Repo
 * `notebooks/` : current analysis code
 * `scripts/` : helper scripts
 * `data/` : project-relevant data
   * `metric_tables/` : structural metrics, genome to temperature table, etc.
   * `figures` : miscellaneous figures
+  * `outputs`: The raw outputs of AlphaFold for the OGT dataset, compiled using script in Section E: Folding With ColabFold.
  
-## Data flow
+## C. Data flow
 
 Diagram is a work in progress
 
-## Notebook outline
+## D. Notebook outline
 1. `notebooks/00_adenylate_kinase.ipynb`
    * Assess OGT dataset (Gosha a.k.a Melnikov)
    * Find and save sequences for ADKs from each genome in Melnikov
@@ -29,8 +32,11 @@ Diagram is a work in progress
    * Miscellaneous attempts to predict temperature from structural
    * Canonical (current, best, manuscript-ready (????) ) structural predictive model
 
+# Compilation of structural features of ADK
 
-## Compilation of structural features
+## E. Folding with ColabFold
+
+### Folding on HPC
 Log in
 ```
 ssh miho1832@login.rc.colorado.edu
@@ -94,7 +100,10 @@ tar -czf ${OUTFILE}_closed.tgz ${OUTFILE}_closed
 rm -r ${OUTFILE}_closed
 cd ..
 ```
-Move outputs to microbe from alpine (run on microbe)
+
+### Moving to analysis server
+
+Move outputs to microbe (analysis server) from alpine (HPC server) (run on microbe)
 ```
 rsync -r miho1832@login.rc.colorado.edu:/projects/miho1832/adenylate_kinase_ogt/data/outputs/ ./
 ```
@@ -107,18 +116,48 @@ mkdir test_structures2
 # from parent directory of outputs
 parallel -j 12 './unpack_structures.sh {}' :::: inds_unpack.txt
 ```
+
+### Computing structural metrics
+
 Run Biopython code
 ```
-python mp_metrics.py [dir to save processed structures] [file to save complete table]
+python src/protein_utils/mp_metrics.py -s [structures to process] -n [number to test code, -1 for all] -t [threads, structures to process at once] -p True --save-processed [dir to save processed structures] -o [file to save complete table]
 ```
+
+This code both creates trimmed, processed versions of the ColabFold structures and a table containing BioPython-based calculation of two metrics: Shrake-Rupley-based SASA and contacts at 4.5 Angstroms.  
+File locations:
+* `processed_structures`: Processed, cleaned outputs of ColabFold
+* `metric_tables/20240524_full_metrics.tsv.gz`: BioPython-based structural metrics
+Command run:
+```
+python src/protein_utils/mp_metrics.py -s  adenylate_kinase_ogt/data/test_structures/ \
+                    -o  adenylate_kinase_ogt/data/test_structures/\
+                    -t 16 \
+                    --write-processed True \
+                    --save-processed adenylate_kinase_ogt/data/processed_structures/
+```  
+
+Additionally, Rosetta was used to calculate more structural metrics. 
+
 Run Rosetta code
+```
+ls processed_structures/ | sed 's/\.pdb//' > new_rosetta_inputs.txt
+# from data/
+parallel -j 20 './../scripts/run_rosetta.sh -i {} -x ./rosetta/ogt_metrics.xml -o ./rosetta_out/ -d ./processed_structures/' :::: ./new_rosetta_inputs.txt
+```
+
 ```
 parallel -j 12 './run_rosetta.sh {}' :::: inds_rosetta.txt
 ```
+
 `inds_rosetta.txt` and `inds_unpack.txt` are lists of the genome ids, one per line, in a text file. Unfortunately the code is crappy and runs with hard coded file paths. So it must be run from `data/`
 
+### Other structural information included:  
 
-## Current workflow 
+1. H-bond data (2026, from Dru)
+2. Lid type (2026, v4)
+
+## F. Current workflow 
 1. Get GTDB genomes with OGTs from Melnikov dataset.
 2. Get highest quality match to PF00406, "adenylate kinase" from each genome using existing mapping of PFam to GTDB r207.
 3. Save genome ADK proteins (GAPs) to files
@@ -131,7 +170,7 @@ parallel -j 12 './run_rosetta.sh {}' :::: inds_rosetta.txt
 10. Manually relaxed unrelaxed open templates
 11. Dru performs analysis
 
-## Improved workflow
+## G. Improved workflow
 1. Get GTDB genomes with OGTs from Melnikov + Enqvist + Corkeys
 2. Get highest quality match to PFO0406 (Adk) + Core + lid + NMP for GTDBr214.1 genomes in (1)
 3. Save Adks with annotations of each domain location.
@@ -151,7 +190,7 @@ while len(unfolded_proteins) > 0:
 ```
 6. Analysis
 
-## Need to figure out
+## H. Need to figure out
 1. Annotating domains
 2. Efficient programmatic relaxation on server
 3. Streamlining "best protein" selection code.

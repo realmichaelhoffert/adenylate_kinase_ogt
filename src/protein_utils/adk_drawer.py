@@ -8,11 +8,15 @@ from scipy.stats import spearmanr
 import sys
 sys.path.append('/data/mhoffert/fiererlab/adenylate_kinase_ogt/protein_utils/')
 
-from pdb_getter import collapse_and_label
 
 from collections import Counter
 
 import numpy as np
+
+# fix this later after adding setup.py
+import sys
+sys.path.append('/data/mhoffert/fiererlab/adenylate_kinase_ogt/')
+from src.protein_utils.pdb_getter import collapse_and_label
 
 # expected structure
 # N - A3 - H1 - A5 - H2 - H3 - H4 - A4 - H5 - A2 - H6 - B1 - B2 - C1 - C2 - C3 - H7 - A1 - H8
