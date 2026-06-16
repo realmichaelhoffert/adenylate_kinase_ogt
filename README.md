@@ -19,7 +19,7 @@ The environment to fold proteins was constructed using the instructions here:
 https://git.embl.de/grp-kosinski/alphafold_howto/-/tree/main
 Also install `ambertools` and `nglview` using the conda-forge channel. You can also install seaborn. If importing doesn't work, downgrading numpy to 1.23.5 fixed this problem for me.
 
-## V. Run ROSEATE on new proteins
+## B. Run ROSEATE on new proteins
 
 ### Annotate your proteins
 I have a helper script, `scripts/run_esm_pipeline.sh`, which can take a list of fastas (nucleotide assemblies or genomes) and extract ADKs from them using PFAM00406 (ADK).  
@@ -167,11 +167,11 @@ y_pred = pd.Series(data=unscale_ogts(preds.mean(axis=0), scaler),
   * `figures` : miscellaneous figures
   * `outputs`: The raw outputs of AlphaFold for the OGT dataset, compiled using script in Section E: Folding With ColabFold.
  
-## C. Data flow
+## D. Data flow
 
 Diagram is a work in progress
 
-## D. Notebook outline
+## E. Notebook outline
 1. `notebooks/00_adenylate_kinase.ipynb`
    * Assess OGT dataset (Gosha a.k.a Melnikov)
    * Find and save sequences for ADKs from each genome in Melnikov
@@ -187,7 +187,7 @@ Diagram is a work in progress
 
 # Compilation of structural features of ADK
 
-## E. Folding with ColabFold
+## F. Folding with ColabFold
 
 ### Folding on HPC
 Log in
@@ -310,7 +310,7 @@ parallel -j 12 './run_rosetta.sh {}' :::: inds_rosetta.txt
 1. H-bond data (2026, from Dru)
 2. Lid type (2026, v4)
 
-## F. Current workflow 
+## H. Current workflow 
 1. Get GTDB genomes with OGTs from Melnikov dataset.
 2. Get highest quality match to PF00406, "adenylate kinase" from each genome using existing mapping of PFam to GTDB r207.
 3. Save genome ADK proteins (GAPs) to files
@@ -343,7 +343,7 @@ while len(unfolded_proteins) > 0:
 ```
 6. Analysis
 
-## H. Need to figure out
+## I. Need to figure out
 1. Annotating domains
 2. Efficient programmatic relaxation on server
 3. Streamlining "best protein" selection code.
