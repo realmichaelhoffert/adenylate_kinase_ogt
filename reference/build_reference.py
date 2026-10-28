@@ -123,7 +123,7 @@ NOTEBOOKS = ["05_esm2_model_v2.ipynb", "figures_final.ipynb", "dev_validation_mo
 def per_site_predict(model, emb, scalers):
     """Copy of src/models/predict.py::per_site_predict (v1)."""
     preds = []
-    for col in model.keys():
+    for col in sorted(model.keys()):
         if scalers is not None:
             site_emb = scalers[col].transform(emb[:, col, :])
         else:
