@@ -1,0 +1,20 @@
+{
+  "python": "3.10.13 | packaged by conda-forge | (main, Dec 23 2023, 15:36:39) [GCC 12.3.0]",
+  "executable": "/data/mhoffert/miniforge3/envs/adenylate_kinase_ogt/bin/python",
+  "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+  "machine": "x86_64",
+  "processor": "x86_64",
+  "hostname": "proteus",
+  "cpu_count": 32,
+  "numpy_version": "1.23.5",
+  "pandas_version": "2.1.4",
+  "scipy_version": "1.15.3",
+  "sklearn_version": "1.4.1.post1",
+  "statsmodels_version": "0.14.1",
+  "glmnet_version": "2.2.1",
+  "torch_version": "2.3.0",
+  "esm_version": "2.0.0",
+  "Bio_version": "1.83",
+  "cuda_available": false,
+  "torch_cuda": null
+}

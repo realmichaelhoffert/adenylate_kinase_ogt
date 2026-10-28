@@ -1,0 +1,12 @@
+{
+  "esm_msa1b_t12_100M_UR50S.pt": {
+    "path": "/data/mhoffert/.cache/torch/hub/checkpoints/esm_msa1b_t12_100M_UR50S.pt",
+    "sha256": "b8f276f513fd8bdfcb0c8ae38371075e35f4af559449e5212374a08880a20429",
+    "bytes": 1387625262
+  },
+  "esm_msa1b_t12_100M_UR50S-contact-regression.pt": {
+    "path": "/data/mhoffert/.cache/torch/hub/checkpoints/esm_msa1b_t12_100M_UR50S-contact-regression.pt",
+    "sha256": "003b2a704d26cf2326a0915bcbc9c8b5aeaaa21fae061052c49302af8156da66",
+    "bytes": 1409
+  }
+}
