@@ -1,0 +1,393 @@
+[
+  {
+    "name": "genome2tax covers all Even + Corkrey genomes",
+    "status": "PASS",
+    "n_ids": 1457,
+    "n_found": 1457
+  },
+  {
+    "name": "c_w_e_context: contexts map to even dataset",
+    "status": "FAIL",
+    "error": "KeyError('NZ_JAEEGB010000020.1_21|RS_GCF_016316925.1|adk|temp=37.0|bitscore=201.9')"
+  },
+  {
+    "name": "corkrey_full_context: contexts map to corkrey dataset",
+    "status": "PASS",
+    "shape": [
+      230,
+      8
+    ]
+  },
+  {
+    "name": "even_full_context: contexts map to even dataset",
+    "status": "PASS",
+    "shape": [
+      1227,
+      8
+    ]
+  },
+  {
+    "name": "model has 215 sites and 215 scalers",
+    "status": "PASS",
+    "n_models": 215,
+    "input_shape": "(1227, 215, 768)"
+  },
+  {
+    "name": "model['predictions'] == mean of full_predictions over all sites",
+    "status": "PASS"
+  },
+  {
+    "name": "true_labels == corkrey_msa_dataset ids (same order)",
+    "status": "PASS"
+  },
+  {
+    "name": "true_values == corkrey_msa_dataset scaled OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "even_temps == even_msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "corkrey_temps == corkrey_msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "c_w_e_temps == corkrey_msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "e_w_c_temps == even_msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "even_full_context: depth 8 and excludes self",
+    "status": "PASS",
+    "shape": [
+      1227,
+      8
+    ]
+  },
+  {
+    "name": "corkrey_full_context: depth 8 and excludes self",
+    "status": "PASS",
+    "shape": [
+      230,
+      8
+    ]
+  },
+  {
+    "name": "even_full_embeddings shape == (1227, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      1227,
+      215,
+      768
+    ],
+    "dtype": "float32"
+  },
+  {
+    "name": "c_w_e_full_embeddings shape == (230, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      230,
+      215,
+      768
+    ],
+    "dtype": "float32"
+  },
+  {
+    "name": "corkrey_full_embeddings shape == (230, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      230,
+      215,
+      768
+    ],
+    "dtype": "float32"
+  },
+  {
+    "name": "e_w_c_full_embeddings shape == (1227, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      1227,
+      215,
+      768
+    ],
+    "dtype": "float32"
+  },
+  {
+    "name": "model(c_w_e embeddings) reproduces stored full_predictions",
+    "status": "PASS",
+    "max_abs_diff": 0.0
+  },
+  {
+    "name": "recomputed per-site Spearmans match saved TSV",
+    "status": "PASS",
+    "max_abs_diff": 0.0
+  },
+  {
+    "name": "good_cols cutoff 0.84 selects 73 sites",
+    "status": "PASS",
+    "n": 73
+  },
+  {
+    "name": "Antarctic: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      910,
+      215,
+      768
+    ],
+    "n_msa": 910
+  },
+  {
+    "name": "Antarctic: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Antarctic: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      910,
+      8
+    ]
+  },
+  {
+    "name": "Arthrobacter: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      53,
+      215,
+      768
+    ],
+    "n_msa": 53
+  },
+  {
+    "name": "Arthrobacter: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Arthrobacter: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      53,
+      8
+    ]
+  },
+  {
+    "name": "Arthrobacter: md and msa_dataset in same protein order (positional metrics valid)",
+    "status": "FAIL",
+    "n_md": 53,
+    "n_pred": 53
+  },
+  {
+    "name": "Australia: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      768,
+      215,
+      768
+    ],
+    "n_msa": 768
+  },
+  {
+    "name": "Australia: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Australia: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      768,
+      8
+    ]
+  },
+  {
+    "name": "Colman2024: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      964,
+      215,
+      768
+    ],
+    "n_msa": 964
+  },
+  {
+    "name": "Colman2024: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Colman2024: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      964,
+      8
+    ]
+  },
+  {
+    "name": "Conteville2024: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      2211,
+      215,
+      768
+    ],
+    "n_msa": 2211
+  },
+  {
+    "name": "Conteville2024: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Conteville2024: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      2211,
+      8
+    ]
+  },
+  {
+    "name": "Mara2023: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      970,
+      215,
+      768
+    ],
+    "n_msa": 970
+  },
+  {
+    "name": "Mara2023: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Mara2023: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      970,
+      8
+    ]
+  },
+  {
+    "name": "Mycobacteria: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      20,
+      215,
+      768
+    ],
+    "n_msa": 20
+  },
+  {
+    "name": "Mycobacteria: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Mycobacteria: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      20,
+      8
+    ]
+  },
+  {
+    "name": "Mycobacteria: md and msa_dataset in same protein order (positional metrics valid)",
+    "status": "PASS",
+    "n_md": 20,
+    "n_pred": 20
+  },
+  {
+    "name": "RoyoLlonch2021: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      7636,
+      215,
+      768
+    ],
+    "n_msa": 7636
+  },
+  {
+    "name": "RoyoLlonch2021: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "RoyoLlonch2021: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      7636,
+      8
+    ]
+  },
+  {
+    "name": "Salazar2019: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      5486,
+      215,
+      768
+    ],
+    "n_msa": 5486
+  },
+  {
+    "name": "Salazar2019: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Salazar2019: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      5486,
+      8
+    ]
+  },
+  {
+    "name": "Shah2024: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      1191,
+      215,
+      768
+    ],
+    "n_msa": 1191
+  },
+  {
+    "name": "Shah2024: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Shah2024: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      1191,
+      8
+    ]
+  },
+  {
+    "name": "Youngblut2020: embeddings shape == (n_msa, 215, 768)",
+    "status": "PASS",
+    "shape": [
+      571,
+      215,
+      768
+    ],
+    "n_msa": 571
+  },
+  {
+    "name": "Youngblut2020: temps == msa_dataset OGTs",
+    "status": "PASS"
+  },
+  {
+    "name": "Youngblut2020: context indices valid (n x 8, < 1227)",
+    "status": "PASS",
+    "shape": [
+      571,
+      8
+    ]
+  },
+  {
+    "name": "figS4.legacy_pcv",
+    "status": "SKIP",
+    "reason": "taxonomic_cv_results.tsv not archived"
+  }
+]
