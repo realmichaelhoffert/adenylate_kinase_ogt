@@ -1,3 +1,4 @@
+*reference*
 *.ipynb_checkpoints*
 *__pycache__*
 *api_key.txt*
