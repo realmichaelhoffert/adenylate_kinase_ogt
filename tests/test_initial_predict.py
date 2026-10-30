@@ -209,25 +209,30 @@ def test_validation_predictions_match_archive(name, spearmans, scaler, archived_
     np.testing.assert_allclose(pred_c, archived.values, atol=1e-6, rtol=1e-7)
 
 
-# # ---------------------------------------------------------------- aggregate.py
-# def test_site_spearmans_recomputed(ref, model, c_w_e):
-#     s = aggregate.site_spearmans(model["best_model"], model["scalers"], c_w_e, model["true_values"])
-#     ref.assert_matches("sites.spearman_test", s.tolist())
+# ---------------------------------------------------------------- aggregate.py
+def test_site_spearmans_recomputed(ref, model, c_w_e):
+    s = aggregate.site_spearmans(model["best_model"], 
+                                 model["scalers"], c_w_e, 
+                                 model['true_labels'],
+                                 model["true_values"])
+    ref.assert_matches("sites.spearman_test", s.tolist())
 
-# def test_load_site_spearmans_matches_expected(ref, spearmans):
-#     ref.assert_matches("sites.spearman_test", spearmans.tolist())
+def test_load_site_spearmans_matches_expected(ref, spearmans):
+    ref.assert_matches("sites.spearman_test", spearmans.tolist())
 
-# def test_good_cols(ref, spearmans):
-#     ref.assert_matches("fig2a.legacy_good_cols",
-#                        {"sites": list(aggregate.good_cols(spearmans, cutoff=0.84))}, subset=True)
+def test_good_cols(ref, spearmans):
+    ref.assert_matches("fig2a.legacy_good_cols",
+                       {"sites": list(aggregate.good_cols(spearmans, cutoff=0.84))}, subset=True)
 
-# @pytest.mark.parametrize("key, use_good_cols", [("fig2a.all_sites", False), ("fig2a.legacy_good_cols", True)])
-# def test_fig2a(ref, model, scaler, spearmans, key, use_good_cols):
-#     fp = np.asarray(model["full_predictions"])            # range order, as in figures_final
-#     sites = aggregate.good_cols(spearmans) if use_good_cols else None
-#     y_true = io.unscale_ogts(model["true_values"], scaler)
-#     y_pred = io.unscale_ogts(aggregate.mean_sites(fp, sites), scaler)
-#     ref.assert_matches(key, metrics(y_true, y_pred), subset=True)
+@pytest.mark.parametrize("key, use_good_cols", [("fig2a.all_sites", False), ("fig2a.legacy_good_cols", True)])
+def test_fig2a(ref, model, scaler, archived_scaler, spearmans, key, use_good_cols):
+    fp = np.asarray(model["full_predictions"])          # range order, as in figures_final
+    sites = aggregate.good_cols(spearmans, 0.84) if use_good_cols else None
+    # print('LENGTH OF SITES', len(sites))
+    y_true = io.unscale_traits(model["true_values"], archived_scaler)
+    # aggregate
+    y_pred = io.unscale_traits(aggregate.mean_sites(fp, sites), archived_scaler)
+    ref.assert_matches(key, metrics(y_true, y_pred), subset=True)
 
 
 
