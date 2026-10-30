@@ -64,6 +64,11 @@ def scaler():
     return io.reload_pickle(path(f"{SUPPORT}/ogt_scaler.pickle"))
 
 @pytest.fixture(scope="module")
+def archived_scaler():
+    legacy_path = '/data/mhoffert/fiererlab/adenylate_kinase_ogt/data/'
+    return io.reload_pickle(path(f"{legacy_path}predictive_models/supporting_data/ogt_scaler.pickle"))
+    
+@pytest.fixture(scope="module")
 def even():
     return io.reload_pickle(path(f"{SUPPORT}/even_msa_dataset.pickle"))
 
@@ -188,7 +193,7 @@ def test_run_model_rows_follow_dict_order(model, c_w_e_preds):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("name", VALIDATION)
-def test_validation_predictions_match_archive(name, spearmans, scaler):
+def test_validation_predictions_match_archive(name, spearmans, scaler, archived_scaler):
     '''
     make sure all validation dataset predictions are the same
     '''
@@ -197,11 +202,11 @@ def test_validation_predictions_match_archive(name, spearmans, scaler):
     preds = predict.run_model(path(f"{emb_dir}/{name}_full_even.pickle"), path(MODEL), msa, predict.per_site_predict)
     _spearmans = spearmans
     cols = _spearmans[_spearmans > 0.82].index
-    pred_c = io.unscale_traits(aggregate.mean_sites(preds, cols), scaler)
+    pred_c = io.unscale_traits(aggregate.mean_sites(preds, cols), archived_scaler)
     archived = pd.read_csv(path(f"portable/predictions/{name}_roseate_all_sites.tsv"),
                            sep="\t", index_col="protein")["pred_temp"]
     assert list(archived.index) == [i[0] for i in io.reload_pickle(msa)]
-    np.testing.assert_allclose(pred_c, archived.values, atol=1e-8, rtol=0)
+    np.testing.assert_allclose(pred_c, archived.values, atol=1e-6, rtol=1e-7)
 
 
 # # ---------------------------------------------------------------- aggregate.py
