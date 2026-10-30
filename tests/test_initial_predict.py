@@ -159,38 +159,49 @@ def test_load_new_dataset_reproduces_archived(name, full, scaler):
         exclude_ids={i[0] for i in full})
     archived = io.reload_pickle(path(f"intermediates/validation_datasets/{name}/embeddings/{name}_msa_dataset.pickle"))
     assert len(archived) == len(ds)
-    # ds_sort = sorted(ds, key=lambda x: x[0])
-    # archived_sort = sorted(archived, key=lambda x: x[0])
-    # assert [i[:2] for i in ds_sort] == [i[:2] for i in archived_sort]
-    # np.testing.assert_allclose([i[2] for i in ds_sort], [i[2] for i in archived_sort], atol=1e-12, rtol=0)
+    ds_sort = sorted(ds, key=lambda x: x[0])
+    archived_sort = sorted(archived, key=lambda x: x[0])
+    assert [i[:2] for i in ds_sort] == [i[:2] for i in archived_sort]
+    np.testing.assert_allclose([i[2] for i in ds_sort], [i[2] for i in archived_sort], atol=1e-12, rtol=0)
 
 
-# # ---------------------------------------------------------------- predict.py
-# @pytest.fixture(scope="module")
-# def c_w_e_preds():
-#     return predict.run_model(path(C_W_E), path(MODEL),
-#                              path(f"{SUPPORT}/corkrey_msa_dataset.pickle"), predict.per_site_predict)
+# ---------------------------------------------------------------- predict.py
+@pytest.fixture(scope="module")
+def c_w_e_preds():
+    return predict.run_model(path(C_W_E), path(MODEL),
+                             path(f"{SUPPORT}/corkrey_msa_dataset.pickle"), predict.per_site_predict)
 
-# def test_run_model_site_means_match_stored_predictions(ref, c_w_e_preds):
-#     ref.assert_array_close(c_w_e_preds.mean(axis=0), "portable/even_enetcv_ind.npz",
-#                            key="predictions", atol=1e-10)
+def test_run_model_site_means_match_stored_predictions(ref, c_w_e_preds):
+    '''
+    make sure predictions are the same
+    '''
+    ref.assert_array_close(c_w_e_preds.mean(axis=0), "portable/even_enetcv_ind.npz",
+                           key="predictions", atol=1e-10)
 
-# def test_run_model_rows_follow_dict_order(model, c_w_e_preds):
-#     """Quirk 9: run_model rows are in model-key order; full_predictions is in range order."""
-#     keys = list(model["best_model"].keys())
-#     np.testing.assert_allclose(c_w_e_preds, np.asarray(model["full_predictions"])[keys], atol=1e-10, rtol=0)
+def test_run_model_rows_follow_dict_order(model, c_w_e_preds):
+    """Quirk 9: run_model rows are in model-key order; full_predictions is in range order."""
+    '''
+    FIXED
+    '''
+    keys = list(sorted(model["best_model"].keys()))
+    np.testing.assert_allclose(c_w_e_preds, np.asarray(model["full_predictions"])[keys], atol=1e-10, rtol=0)
 
-# @pytest.mark.slow
-# @pytest.mark.parametrize("name", VALIDATION)
-# def test_validation_predictions_match_archive(name, scaler):
-#     emb_dir = f"intermediates/validation_datasets/{name}/embeddings"
-#     msa = path(f"{emb_dir}/{name}_msa_dataset.pickle")
-#     preds = predict.run_model(path(f"{emb_dir}/{name}_full_even.pickle"), path(MODEL), msa, predict.per_site_predict)
-#     pred_c = io.unscale_ogts(aggregate.mean_sites(preds), scaler)
-#     archived = pd.read_csv(path(f"portable/predictions/{name}_roseate_all_sites.tsv"),
-#                            sep="\t", index_col="protein")["pred_temp"]
-#     assert list(archived.index) == [i[0] for i in io.reload_pickle(msa)]
-#     np.testing.assert_allclose(pred_c, archived.values, atol=1e-8, rtol=0)
+@pytest.mark.slow
+@pytest.mark.parametrize("name", VALIDATION)
+def test_validation_predictions_match_archive(name, spearmans, scaler):
+    '''
+    make sure all validation dataset predictions are the same
+    '''
+    emb_dir = f"intermediates/validation_datasets/{name}/embeddings"
+    msa = path(f"{emb_dir}/{name}_msa_dataset.pickle")
+    preds = predict.run_model(path(f"{emb_dir}/{name}_full_even.pickle"), path(MODEL), msa, predict.per_site_predict)
+    _spearmans = spearmans
+    cols = _spearmans[_spearmans > 0.82].index
+    pred_c = io.unscale_traits(aggregate.mean_sites(preds, cols), scaler)
+    archived = pd.read_csv(path(f"portable/predictions/{name}_roseate_all_sites.tsv"),
+                           sep="\t", index_col="protein")["pred_temp"]
+    assert list(archived.index) == [i[0] for i in io.reload_pickle(msa)]
+    np.testing.assert_allclose(pred_c, archived.values, atol=1e-8, rtol=0)
 
 
 # # ---------------------------------------------------------------- aggregate.py
