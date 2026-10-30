@@ -9,6 +9,7 @@ import string
 import pickle
 import copy
 import os
+import warnings
 
 # ML utils
 from sklearn.preprocessing import StandardScaler
@@ -23,7 +24,7 @@ from Bio import SeqIO as SeqIO
 import pandas as pd
 # import matplotlib.pyplot as plt
 # import seaborn as sns
-# import numpy as np
+import numpy as np
 # from scipy.stats import spearmanr
 
 
@@ -40,6 +41,8 @@ def construct_msa_dataset(file : str,
     trait_data: string, path to comma or tab-delimited file with:
         column 0: sequence id (exactly as in fasta)
         column 1: trait values
+
+    Note: only returns MSA for values found in trait_data
     '''
     # checks
     assert os.path.exists(file), f'{file} not found'
@@ -50,13 +53,19 @@ def construct_msa_dataset(file : str,
         records = [r for r in SeqIO.parse(handle=handle, format='fasta')]
 
     # read trait data, assumes column 1 is ids, column 2 is trait data
-    trait_data = pd.read_csv(trait_data, sep=None, engine='python', index_col=0).iloc[:, 0]
+    trait_data = pd.read_csv(trait_data, sep=None, engine='python', index_col=0).iloc[:, 0].dropna()
     # check ids
-    assert all([r.id in trait_data.index for r in records]), f'check seq ids match trait data'
+    assert len(records) == len(set([r.id for r in records]))
+    record_ids = set([r.id for r in records])
+    assert all([t_id in record_ids for t_id in trait_data.index]), f'all trait data in records'
+    intersection_size =  len(record_ids.intersection(set(trait_data.index)))
+    if intersection_size != len(record_ids):
+        warnings.warn(f'Only {intersection_size} records are in the trait data')
     
     seqs_with_trait = {}
     for r in records:
-        seqs_with_trait[r.id] = (str(r.seq), trait_data.loc[r.id])
+        if r.id in trait_data.index:
+            seqs_with_trait[r.id] = (str(r.seq), trait_data.loc[r.id])
     return [(k, item[0], item[1]) for k, item in seqs_with_trait.items()]
 
 # trait scaling 
@@ -104,27 +113,82 @@ def assess_model(y_true, y_pred):
 
 
 def subset_corkrey(dataset : MSADataset,
-                   corkrey_gtdb_match : str,
-                   corkrey_data : str) -> MSADataset:
+                   corkrey_gtdb_match_file : str,
+                   corkrey_data_file : str) -> MSADataset:
 
     '''
     Temporary function to reconstruct corkrey dataset
-    '''
-
+    legacy paths: '/data/mhoffert/fiererlab/ogt/results/db/corkey_gtdb_matching.tsv'
+    '/data/mhoffert/fiererlab/ogt/source_data/Corkey_temperatures.csv'
     
-
-    for file in [corkrey_gtdb_match, corkrey_data]:
+    '''
+    for file in [corkrey_gtdb_match_file, corkrey_data_file]:
         assert os.path.exists(file), f'{file} not found'
 
-    corkrey_matches = pd.read_csv(, sep='\t', index_col=0)
-    corkrey_data = pd.read_csv('/data/mhoffert/fiererlab/ogt/source_data/Corkey_temperatures.csv')
+    corkrey_matches = pd.read_csv(corkrey_gtdb_match_file, sep='\t', index_col=0)
+    corkrey_data = pd.read_csv(corkrey_data_file)
     corkrey_full = pd.merge(corkrey_data.groupby('binomial.name').agg({'T.C':'mean'}), corkrey_matches, left_index=True, right_on='original_id')
     
     # get ids
     corkrey_ids = set(corkrey_full['match_accession'].unique())
     #
-    corkrey_msa_dataset = [i for i in full_msa_dataset if i[0].split('|')[1] in corkrey_ids]
-    print("Number of observations in Corkrey dataset:", len(corkrey_msa_dataset))
+    corkrey_msa_dataset = [i for i in dataset if i[0].split('|')[1] in corkrey_ids]
+    # print("Number of observations in Corkrey dataset:", len(corkrey_msa_dataset))
+    return corkrey_msa_dataset, corkrey_ids
+
+def sample_even(dataset, exclude, n_bins=40, n_per_bin=100 ):
+    '''
+    Function to recreate sampling of even dataset
+    dataset: MSADataset to subsample
+    exclude: IDs from test data to exclude
+    n_bins: number of bins to segment trait data into
+    n_per_bin: max number to select per bin
+    '''
+    
+    dataset_df = pd.DataFrame(dataset, columns=['id', 'seq', 'ogt'])
+    lower = np.floor(dataset_df['ogt'].min()) - 1
+    upper = np.ceil(dataset_df['ogt'].max())
+    dataset_df['group'] = pd.cut(dataset_df['ogt'], np.linspace(lower, upper, n_bins))
+    even_ids = dataset_df.groupby('group', observed=True).apply(lambda x: x.sample(np.min([len(x), n_per_bin]), random_state=111, replace=False))['id'].unique()
+
+    even_dataset = [i for i in dataset if i[0] in even_ids and not i[0] in exclude]
+    return even_dataset, set([i[0] for i in even_dataset])
+
+def save_split(dataset, path, dataset_name):
+    '''
+    Save a subset of the data
+    '''
+    assert os.path.exists(path)
+    
+    with open(os.path.join(path, dataset_name, '_msa_dataset.pickle'), 'wb') as handle:
+        pickle.dump(dataset, handle)
+
+    with open(os.path.join(path, dataset_name, '_ids.pickle'), 'wb') as handle:
+        pickle.dump([i[0] for i in dataset], handle)
+
+def load_new_dataset(afa_file : str, 
+                     trait_data : str,  
+                     scaler : StandardScaler, 
+                     exclude_ids : list) -> MSADataset:
+    '''
+    Load a new dataset
+    afa_file: strfile sequences of dataset inserted into backbone
+    trait_data: str, file of trait data, column 0 = seq id column 1 = trait
+    scaler: existing trait data scaler
+    exclude_ids: ids to exclude (e.g. those from backbone)
+    '''
+
+    for file in [afa_file, trait_data]:
+        assert os.path.exists(file), f'{file} not found'
+        
+    # read msa
+    msa_dataset = construct_msa_dataset(afa_file, trait_data)
+    # scale traits using provided scaler
+    scaled_msa_dataset, _ = scale_traits(msa_dataset, scaler)
+    return scaled_msa_dataset
+    
+    
+    
 
 # # function to get weights based on y variable density
 # def compute_gaussian_weights(_y):
