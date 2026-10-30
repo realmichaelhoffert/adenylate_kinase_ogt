@@ -33,7 +33,7 @@ MSADataset = list[tuple]
 # get_ogt = lambda _str: float(_str.split('temp=')[-1].split('|')[0])
 
 def construct_msa_dataset(file : str,
-                          trait_data : str) -> MSADataset:
+                          trait_data : str = None) -> MSADataset:
     '''
     Function to read in an aligned fasta and get a dataset:
     list(tuple): (id, sequence, trait_value)
@@ -46,27 +46,65 @@ def construct_msa_dataset(file : str,
     '''
     # checks
     assert os.path.exists(file), f'{file} not found'
-    assert os.path.exists(trait_data), f'{trait_data} not found'
     
+
     # set up dataset
     with open(file, 'r') as handle:
         records = [r for r in SeqIO.parse(handle=handle, format='fasta')]
 
-    # read trait data, assumes column 1 is ids, column 2 is trait data
-    trait_data = pd.read_csv(trait_data, sep=None, engine='python', index_col=0).iloc[:, 0].dropna()
-    # check ids
-    assert len(records) == len(set([r.id for r in records]))
-    record_ids = set([r.id for r in records])
-    assert all([t_id in record_ids for t_id in trait_data.index]), f'all trait data in records'
-    intersection_size =  len(record_ids.intersection(set(trait_data.index)))
-    if intersection_size != len(record_ids):
-        warnings.warn(f'Only {intersection_size} records are in the trait data')
+    if trait_data is not None:
+        assert os.path.exists(trait_data), f'{trait_data} not found'
+    
+        # read trait data, assumes column 1 is ids, column 2 is trait data
+        trait_data = pd.read_csv(trait_data, sep=None, engine='python', index_col=0).iloc[:, 0].dropna()
+        # check ids
+        assert len(records) == len(set([r.id for r in records]))
+        record_ids = set([r.id for r in records])
+        assert all([t_id in record_ids for t_id in trait_data.index]), f'all trait data in records'
+        intersection_size =  len(record_ids.intersection(set(trait_data.index)))
+        if intersection_size != len(record_ids):
+            warnings.warn(f'Only {intersection_size} records are in the trait data')
     
     seqs_with_trait = {}
     for r in records:
-        if r.id in trait_data.index:
-            seqs_with_trait[r.id] = (str(r.seq), trait_data.loc[r.id])
+        if trait_data is not None:
+            if r.id in trait_data.index:
+                seqs_with_trait[r.id] = (str(r.seq), trait_data.loc[r.id])
+        else:
+            seqs_with_trait[r.id] = (str(r.seq), np.nan)
     return [(k, item[0], item[1]) for k, item in seqs_with_trait.items()]
+
+def save_split(dataset, path, dataset_name):
+    '''
+    Save a subset of the data
+    '''
+    assert os.path.exists(path)
+    
+    with open(os.path.join(path, dataset_name, '_msa_dataset.pickle'), 'wb') as handle:
+        pickle.dump(dataset, handle)
+
+    with open(os.path.join(path, dataset_name, '_ids.pickle'), 'wb') as handle:
+        pickle.dump([i[0] for i in dataset], handle)
+
+def load_new_dataset(afa_file : str, 
+                     scaler : StandardScaler, 
+                     exclude_ids : list = [], 
+                    trait_data : str = None, ) -> MSADataset:
+    '''
+    Load a new dataset
+    afa_file: strfile sequences of dataset inserted into backbone
+    trait_data: str, file of trait data, column 0 = seq id column 1 = trait
+    scaler: existing trait data scaler
+    exclude_ids: ids to exclude (e.g. those from backbone)
+    '''
+    assert os.path.exists(afa_file), f'{afa_file} not found'
+        
+    # read msa
+    msa_dataset = construct_msa_dataset(afa_file, trait_data)
+    msa_dataset = [i for i in msa_dataset if not i[0] in exclude_ids]
+    # scale traits using provided scaler
+    scaled_msa_dataset, _ = scale_traits(msa_dataset, scaler)
+    return scaled_msa_dataset
 
 # trait scaling 
 def scale_traits(msa_dataset : MSADataset, scaler : StandardScaler = None) -> MSADataset:
@@ -154,38 +192,7 @@ def sample_even(dataset, exclude, n_bins=40, n_per_bin=100 ):
     even_dataset = [i for i in dataset if i[0] in even_ids and not i[0] in exclude]
     return even_dataset, set([i[0] for i in even_dataset])
 
-def save_split(dataset, path, dataset_name):
-    '''
-    Save a subset of the data
-    '''
-    assert os.path.exists(path)
-    
-    with open(os.path.join(path, dataset_name, '_msa_dataset.pickle'), 'wb') as handle:
-        pickle.dump(dataset, handle)
 
-    with open(os.path.join(path, dataset_name, '_ids.pickle'), 'wb') as handle:
-        pickle.dump([i[0] for i in dataset], handle)
-
-def load_new_dataset(afa_file : str, 
-                     trait_data : str,  
-                     scaler : StandardScaler, 
-                     exclude_ids : list) -> MSADataset:
-    '''
-    Load a new dataset
-    afa_file: strfile sequences of dataset inserted into backbone
-    trait_data: str, file of trait data, column 0 = seq id column 1 = trait
-    scaler: existing trait data scaler
-    exclude_ids: ids to exclude (e.g. those from backbone)
-    '''
-
-    for file in [afa_file, trait_data]:
-        assert os.path.exists(file), f'{file} not found'
-        
-    # read msa
-    msa_dataset = construct_msa_dataset(afa_file, trait_data)
-    # scale traits using provided scaler
-    scaled_msa_dataset, _ = scale_traits(msa_dataset, scaler)
-    return scaled_msa_dataset
     
     
     

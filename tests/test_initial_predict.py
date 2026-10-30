@@ -157,15 +157,22 @@ def test_unscale_round_trip(scaler, corkrey):
 @pytest.mark.slow
 @pytest.mark.parametrize("name", VALIDATION)
 def test_load_new_dataset_reproduces_archived(name, full, scaler):
+    # construct data
+    # for this test, trait_data goes in
     ds = io.load_new_dataset(
         path(f"inputs/high_qual_alignments/alignments_to_backbone/{name}_adk_to_backbone.afa"),
-        path(f"inputs/validation_datasets/{name}/md/{name}_temp_data.tsv"),
+        trait_data=path(f"inputs/validation_datasets/{name}/md/{name}_temp_data.tsv"),
         scaler=scaler, 
         exclude_ids={i[0] for i in full})
+    # load archieved version
     archived = io.reload_pickle(path(f"intermediates/validation_datasets/{name}/embeddings/{name}_msa_dataset.pickle"))
+    # drop nas from ds
+
+    # check lengths
     assert len(archived) == len(ds)
     ds_sort = sorted(ds, key=lambda x: x[0])
     archived_sort = sorted(archived, key=lambda x: x[0])
+    # make sure scaled values are identical
     assert [i[:2] for i in ds_sort] == [i[:2] for i in archived_sort]
     np.testing.assert_allclose([i[2] for i in ds_sort], [i[2] for i in archived_sort], atol=1e-12, rtol=0)
 
@@ -201,8 +208,10 @@ def test_validation_predictions_match_archive(name, spearmans, scaler, archived_
     msa = path(f"{emb_dir}/{name}_msa_dataset.pickle")
     preds = predict.run_model(path(f"{emb_dir}/{name}_full_even.pickle"), path(MODEL), msa, predict.per_site_predict)
     _spearmans = spearmans
-    cols = _spearmans[_spearmans > 0.82].index
-    pred_c = io.unscale_traits(aggregate.mean_sites(preds, cols), archived_scaler)
+    # cols = _spearmans[_spearmans > 0.84].index
+    # pred_c = io.unscale_traits(aggregate.mean_sites(preds, cols), archived_scaler)
+    pred_c = io.unscale_traits(aggregate.mean_sites(preds), archived_scaler)
+
     archived = pd.read_csv(path(f"portable/predictions/{name}_roseate_all_sites.tsv"),
                            sep="\t", index_col="protein")["pred_temp"]
     assert list(archived.index) == [i[0] for i in io.reload_pickle(msa)]
