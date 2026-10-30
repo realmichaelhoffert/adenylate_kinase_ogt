@@ -90,7 +90,7 @@ def build_parser():
     s.add_argument("--sites", choices=["all", "legacy_fig2a"], default="all")
     s.add_argument("--spearmans", type=Path, help="site Spearman TSV, for --sites legacy_fig2a")
     s.add_argument("--cutoff", type=float, default=0.84)
-    s.add_argument("--per-site", type=Path, help="also save the (215, n) per-site predictions")
+    s.add_argument("--per-site", type=Path, help="also save the (protein_len, n) per-site predictions")
     s.add_argument("--out", type=Path)
     s.set_defaults(func=cmd_predict)
 

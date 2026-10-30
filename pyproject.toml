@@ -10,8 +10,12 @@ requires-python = ">=3.10"
 [project.scripts]
 roseate = "roseate.cli:main"
 
-[tool.setuptools.packages.find]
-include = ["roseate*"]
+[tool.setuptools]
+packages = ["roseate"]
+include-package-data = false
+
+# [tool.setuptools.packages.find]
+# include = ["roseate*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
