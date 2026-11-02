@@ -26,9 +26,12 @@ def run_model(
                              scalers=loaded_model['scalers'] if 'scalers' in loaded_model.keys() else None))
     return predictions
 
-def per_site_predict(model, emb, scalers):
+def per_site_predict(models, emb, scalers):
     '''
     Function to compute per-site predictions
+    models: dict, site/alignment col -> model obj
+    emb: matrix, proteins x aln_len x n_emb_dim
+    scalers: dict, site/alignment col -> scaler obj
     '''
 
     preds = []
