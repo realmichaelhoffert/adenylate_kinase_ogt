@@ -21,7 +21,7 @@ def run_model(
     # make sure loaded embeddings match embeddings data was run on
     assert loaded_model['metadata']['input_shape'][1:] == loaded_embeddings.shape[1:]
     
-    predictions = np.array(predict_fn(model=loaded_model['best_model'], 
+    predictions = np.array(predict_fn(models=loaded_model['best_model'], 
                              emb=loaded_embeddings,
                              scalers=loaded_model['scalers'] if 'scalers' in loaded_model.keys() else None))
     return predictions
