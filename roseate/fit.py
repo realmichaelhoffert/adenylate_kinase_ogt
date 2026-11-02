@@ -30,19 +30,30 @@ ENETCV_PARAMS = {'l1_ratio':[0.01, 0.1, 0.25, .5, .75, .9, 0.99, 1.0],
                 'random_state':123, 
                 'n_jobs':24}
 
-def train_per_site(train_emb : np.array, train_y : np.array):
+def train_per_site(train_emb : np.array, train_y : np.array, sites = None, verbose = False):
 
     '''
     Fit per-site models
     train_emb: matrix, (n_proteins x protein_len x n_emb_dim)
     train_y: vector, values of trait
+    sites: which sites to train
     '''
 
     col_enets = {}
     col_scalers = {}
-    for col in tqdm(range(train_emb.shape[1])):
-        display(col)
-        clear_output(wait=True)
+    if sites is not None:
+        try:
+            emb = train_emb[:, sites, :]
+        except KeyError:
+            assert False, 'sites must be subset of columns'
+    else:
+        emb = train_emb
+        sites = range(emb.shape[1])
+        
+    if verbose:
+        print(f'Training on {emb.shape[1]} sites...')
+        
+    for col in tqdm(sites):
         # get column of embedding
         col_embedding = train_emb[:, col, :]
         col_scalers[col] = StandardScaler()
@@ -60,9 +71,6 @@ def test_per_site(models, scalers, test_emb):
     wrapper for test predictions
     '''
     return per_site_predict(models, test_emb, scalers)
-
-
-
 
 def package_model(model_label : str,
                   enets : dict, 
@@ -83,10 +91,11 @@ def package_model(model_label : str,
     '''
     
     full_predictions = np.asarray(test_preds)
-    metadata = {"input_shape": input_shape, "type": model_type}
+    metadata = {"input_shape": input_shape, 
+                "type": model_type, 
+                'label':model_label}
     metadata.update(extra_metadata or {})
     model = {
-        "model_label":model_label,
         "best_model": enets,
         "scalers": scalers,
         "full_predictions": full_predictions,

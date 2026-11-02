@@ -35,12 +35,12 @@ def per_site_predict(models, emb, scalers):
     '''
 
     preds = []
-    for col in tqdm(sorted(model.keys())):
+    for col in tqdm(sorted(models.keys())):
         if scalers is not None:
             site_emb = scalers[col].transform(emb[:, col, :])
         else:
             site_emb = emb[:, col, :]
             
-        preds.append(model[col].predict(site_emb))
+        preds.append(models[col].predict(site_emb))
     
     return preds
