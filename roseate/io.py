@@ -131,6 +131,14 @@ def unscale_traits(trait_list, scaler : StandardScaler) -> list:
     """
     return scaler.inverse_transform(np.array(trait_list).reshape(1, -1))[0]
 
+def save_pickle(obj, path : str) -> None:
+    """
+    Code to reload models saved as pickles
+    (usually a dictionary)
+    """
+    with open(path, 'wb') as handle:
+        pickle.dump(obj, handle)
+
 def reload_pickle(path : str) -> dict:
     """
     Code to reload models saved as pickles

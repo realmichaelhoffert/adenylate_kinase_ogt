@@ -26,6 +26,8 @@ MSADataset = list[tuple]
 def load_plm():
     '''
     Load ESM-based PLM 
+
+    Note: need to allow model swapping?
     '''
     # load ESM model
     esm_msa_model, alphabet = esm.pretrained.esm_msa1b_t12_100M_UR50S()
@@ -41,7 +43,7 @@ def get_embeddings(model : esm.model.msa_transformer.MSATransformer,
                    data_to_embed : MSADataset, 
                    context_dataset : MSADataset,
                    context_inds : list[list[int]],
-                   layer=12, return_mean=True) -> (np.array, np.array):
+                   layer=12, return_mean=False) -> (np.array, np.array):
     '''
     model: esm msa transformer
     converter: esm batch converter

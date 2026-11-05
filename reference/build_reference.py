@@ -323,11 +323,12 @@ def msa_dataset_to_tsv(ds, path):
     pd.DataFrame(ds, columns=["id", "aligned_seq", "ogt_scaled"]).to_csv(path, sep="\t", index=False)
 
 
-def context_to_indices(ctx, dataset):
+def context_to_indices(ctx, dataset, allow_oversampling=False):
     """Saved get_embeddings contexts are lists of (id, seq); convert to integer indices."""
     id2i = {}
     for i, item in enumerate(dataset):
-        assert item[0] not in id2i, f"duplicate id in context dataset: {item[0]}"
+        if allow_oversampling:
+            assert item[0] not in id2i, f"duplicate id in context dataset: {item[0]}"
         id2i[item[0]] = i
     rows = []
     for row in ctx:
