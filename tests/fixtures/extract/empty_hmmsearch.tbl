@@ -1,0 +1,13 @@
+#                                                               --- full sequence ---- --- best 1 domain ---- --- domain number estimation ----
+# target name        accession  query name           accession    E-value  score  bias   E-value  score  bias   exp reg clu  ov env dom rep inc description of target
+#------------------- ---------- -------------------- ---------- --------- ------ ----- --------- ------ -----   --- --- --- --- --- --- --- --- ---------------------
+#
+# Program:         hmmsearch
+# Version:         3.4 (Aug 2023)
+# Pipeline mode:   SEARCH
+# Query file:      PF00406.hmm
+# Target file:     nohit.faa
+# Option settings: hmmsearch --tblout empty_hmmsearch.tbl PF00406.hmm nohit.faa 
+# Current dir: .
+# Date:            Thu Nov  5 20:28:59 2026
+# [ok]
