@@ -120,7 +120,7 @@ def cmd_embed(args, vprint):
     vprint(f'Embeddings saved to {outpath}')
     
 @verbose_print
-def cmd_predict(args):
+def cmd_predict(args, vprint):
     '''
     Run PREDICT command
     USAGE:

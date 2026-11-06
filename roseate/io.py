@@ -148,14 +148,14 @@ def reload_pickle(path : str) -> dict:
         model_data = pickle.load(handle)
     return model_data
 
-def assess_model(y_true, y_pred):
-    '''
-    Run model assessment
-    '''
-    r2 = r2_score(y_true, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    _spearmanr = spearmanr(y_true, y_pred)[0]
-    return '$R^{2}$=' + f'{r2:.2f}|RMSE={rmse:.2f}|SpR={_spearmanr:.2f}', (r2, rmse, _spearmanr)
+# def assess_model(y_true, y_pred):
+#     '''
+#     Run model assessment
+#     '''
+#     r2 = r2_score(y_true, y_pred)
+#     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+#     _spearmanr = spearmanr(y_true, y_pred)[0]
+#     return '$R^{2}$=' + f'{r2:.2f}|RMSE={rmse:.2f}|SpR={_spearmanr:.2f}', (r2, rmse, _spearmanr)
 
 
 def subset_corkrey(dataset : MSADataset,
