@@ -98,7 +98,7 @@ run_prodigal() {
     fi
 
     # Cleanup
-    [[ -f "/tmp/${base}_temp.fa" ]] && rm "/tmp/${base}_temp.fa"
+    if [[ -f "/tmp/${base}_temp.fa" ]]; then rm "/tmp/${base}_temp.fa"; fi
 }
 
 export -f run_prodigal
