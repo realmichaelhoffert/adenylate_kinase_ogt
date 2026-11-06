@@ -1,5 +1,5 @@
 # v1 neural-network regressor, used only by the legacy phylogenetic CV (evaluate.legacy_pcv_models)
-# Copied from src/models/nn_models.py; AttentionRegressor (Table S2 only) left there.
+# Copied from s r c/models/nn_models.py; AttentionRegressor (Table S2 only) left there.
 # Written by Michael Hoffert
 
 import torch
