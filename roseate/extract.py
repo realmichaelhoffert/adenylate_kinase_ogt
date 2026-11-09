@@ -58,7 +58,7 @@ def read_pfam_table_pandas(file_path):
     return table
 
 
-def process_hmms(loc, n_proteins=1, min_score=100, write_file=True):
+def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_file=True):
     '''
     For every *.tbl under loc, keep the n_proteins best hits with full_score >= min_score and
     write them from {genome}_proteins.faa to {genome}_adk.faa (existing files are not overwritten).
@@ -78,8 +78,9 @@ def process_hmms(loc, n_proteins=1, min_score=100, write_file=True):
         except ValueError:
             print(f'Table contained no records:\n{file}')
             continue
-
-        genome = file.split('/')[-1].split('_PF')[0]
+            
+        genome = os.path.basename(file).removesuffix('_hmmsearch.tbl').split('_PF')[0]
+        assert '|' not in genome, "Genome ids cannot contain (|) (and really shouldn't contain special chars other than _ and .)"
         top = df[df['full_score'] >= min_score].sort_values('full_score', ascending=False).iloc[:n_proteins]
         gene2score = dict(zip(top['target_name'], top['full_score']))
         if not write_file:
@@ -91,10 +92,9 @@ def process_hmms(loc, n_proteins=1, min_score=100, write_file=True):
 
         for r in records:
             r.seq = r.seq.replace('*', '')
-            new_id = '|'.join([r.id.split(' # ')[0], genome, 'XXXtemp=XXX', f'bitscore={gene2score[r.id]}'])
+            new_id = '|'.join([r.id.split(' # ')[0], genome, protein_name, f'bitscore={gene2score[r.id]}'])
             r.id = r.description = new_id
-
-        outfile = file.replace('_hmmsearch.tbl', '_adk.faa')
+        outfile = file.replace('_hmmsearch.tbl', f'_{protein_name}.faa')
         if not os.path.exists(outfile):
             with open(outfile, 'w') as out_handle:
                 SeqIO.write(records, out_handle, 'fasta')
@@ -102,13 +102,14 @@ def process_hmms(loc, n_proteins=1, min_score=100, write_file=True):
     return written
 
 
-def concat_adks(loc, out='adks.faa'):
+def concat_adks(loc, protein_name='adk', out='adks.faa'):
     '''
     Concatenate {genome}_adk.faa files in loc into one FASTA (iso: 'cat ./genomes/*_adk.faa > adks.faa').
     Files are joined in sorted name order.
     '''
     with open(out, 'wb') as out_handle:
-        for f in sorted(glob.glob(os.path.join(loc, '*_adk.faa'))):
+        print('files found', glob.glob(os.path.join(loc, f'*_{protein_name}.faa')))
+        for f in sorted(glob.glob(os.path.join(loc, f'*_{protein_name}.faa'))):
             with open(f, 'rb') as handle:
                 out_handle.write(handle.read())
     return out

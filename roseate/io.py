@@ -73,10 +73,10 @@ def save_split(dataset, path, dataset_name):
     '''
     assert os.path.exists(path)
     
-    with open(os.path.join(path, dataset_name, '_msa_dataset.pickle'), 'wb') as handle:
+    with open(os.path.join(path, f'{dataset_name}_msa_dataset.pickle'), 'wb') as handle:
         pickle.dump(dataset, handle)
 
-    with open(os.path.join(path, dataset_name, '_ids.pickle'), 'wb') as handle:
+    with open(os.path.join(path, f'{dataset_name}_ids.pickle'), 'wb') as handle:
         pickle.dump([i[0] for i in dataset], handle)
 
 def load_new_dataset(afa_file : str, 
