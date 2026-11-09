@@ -51,7 +51,7 @@ def test_best_hit_written_with_header(genome_dir):
     written = extract.process_hmms(genome_dir, n_proteins=1, min_score=100)
     assert [Path(w).name for w in written] == ['genomeA_adk.faa']
     records = read(genome_dir / 'genomeA_adk.faa')
-    assert [r.id for r in records] == ['contig_2_1|genomeA_hmmsearch.tbl|bitscore=192.6']
+    assert [r.id for r in records] == ['contig_2_1|genomeA|adk|bitscore=192.6']
     assert '*' not in str(records[0].seq)
 
 def test_n_proteins_keeps_hits_in_protein_file_order(genome_dir):

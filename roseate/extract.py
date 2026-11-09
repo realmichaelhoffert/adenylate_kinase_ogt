@@ -102,7 +102,7 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
     return written
 
 
-def concat_adks(loc, protein_name='adk', out='adks.faa'):
+def concat_adks(loc, out='adks.faa', protein_name='adk'):
     '''
     Concatenate {genome}_adk.faa files in loc into one FASTA (iso: 'cat ./genomes/*_adk.faa > adks.faa').
     Files are joined in sorted name order.
