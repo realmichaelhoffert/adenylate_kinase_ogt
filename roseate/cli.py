@@ -16,7 +16,8 @@ from roseate.decorators import *
 REQUIRED = {"predict": ["model", "emb", "msa_dataset", "scaler", "out"], 
             'embed': ['embed_dataset', 'context_dataset', 'out']}
 
-
+class UsageError(Exception):
+    '''Invalid argument combination, reported like an argparse error.'''
 
 def _sha256(path):
     '''
@@ -142,8 +143,22 @@ def cmd_predict(args, vprint):
         pd.read_csv(args.spearmans, sep="\t", index_col=0)["0"], cutoff=args.cutoff)
     # get protein ids
     ids = [i[0] for i in io.reload_pickle(args.msa_dataset)]
+    
+    # check sites and spearmans
+    if args.sites == 'all':
+        sites = None
+    elif args.sites == 'cv_top':
+        if args.n_sites is None:
+            raise UsageError('--n-sites is required with --sites cv_top')
+        sites = aggregate.cv_top_sites(model['best_model'], args.n_sites)
+    elif args.sites == 'legacy_fig2a':
+        if args.spearmans is None:
+            raise UsageError("A pre-calculated file of spearmans is required")
+        sites = aggregate.good_cols(aggregate.load_site_spearmans(args.spearmans))
+        
+    pred = aggregate.mean_sites(preds, sites)
     # perform prediction
-    pred_c = io.unscale_traits(aggregate.mean_sites(preds, sites), scaler)
+    pred_c = io.unscale_traits(pred, scaler)
     # save preds
     pd.Series(pred_c, index=ids, name="pred_ogt_C").to_csv(args.out, sep="\t", index_label="protein")
     # if user wants per-site saved too,
@@ -182,9 +197,10 @@ def build_parser():
     sub_pred.add_argument("--emb", type=Path)
     sub_pred.add_argument("--msa-dataset", type=Path)
     sub_pred.add_argument("--scaler", type=Path)
-    sub_pred.add_argument("--sites", choices=["all", "legacy_fig2a"], default="all")
+    sub_pred.add_argument("--sites", choices=["all", "cv_top", "legacy_fig2a"], default="all")
+    sub_pred.add_argument("--n-sites", type=int, default=10, help="with --sites=cv_top: # of sites to use")
     sub_pred.add_argument("--spearmans", type=Path, help="site Spearman TSV, for --sites legacy_fig2a")
-    sub_pred.add_argument("--cutoff", type=float, default=0.84)
+    sub_pred.add_argument("--cutoff", type=float, default=0.84, help='sites to use, spearman R cutoff')
     sub_pred.add_argument("--per-site", type=Path, help="also save the (protein_len, n) per-site predictions")
     sub_pred.add_argument("--out", type=Path)
     sub_pred.set_defaults(func=cmd_predict)
@@ -211,7 +227,10 @@ def main(argv=None):
     for name in REQUIRED.get(args.command, []):
         if getattr(args, name) is None:
             parser.error(f"--{name.replace('_', '-')} is required (on the command line or in --config)")
-    return args.func(args)
+    try:
+        return args.func(args)
+    except UsageError as e:
+        subs[args.command].error(str(e))
 
 if __name__ == "__main__":
     sys.exit(main())

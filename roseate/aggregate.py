@@ -64,3 +64,7 @@ def site_spearmans(models : dict,
 
 def good_cols(col_rs, cutoff):
     return col_rs[col_rs > cutoff].index
+
+ def cv_site_scores(models):
+       '''Best mean cross-validation MSE per site, from training folds only (lower is better).'''
+       return pd.Series({site: m.mse_path_.mean(axis=-1).min() for site, m in models.items()})
