@@ -119,6 +119,7 @@ def cmd_embed(args, vprint):
     io.save_pickle(emb, outpath)
     np.save(outpath.replace('.pickle', '.npy'), emb)
     vprint(f'Embeddings saved to {outpath}')
+    write_run_record(args, Path(args.out).parent, [args.embed_dataset, args.context_dataset, args.context_seed, args.context_size, args.exclude_self])
     
 @verbose_print
 def cmd_predict(args, vprint):
