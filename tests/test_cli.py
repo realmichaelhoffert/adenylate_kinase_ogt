@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from roseate import aggregate, cli, io, predict
-from tests.test_initial_predict import MODEL, REF, SUPPORT, VALIDATION, path
+from tests.archive import *
 
 pytestmark = pytest.mark.skipif(not VALIDATION, reason="no validation datasets in archive")
 NAME = VALIDATION[0] if VALIDATION else None

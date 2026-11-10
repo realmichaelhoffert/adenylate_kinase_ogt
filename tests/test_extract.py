@@ -13,7 +13,7 @@ import pytest
 from Bio import SeqIO
 
 from roseate import extract
-from tests.test_initial_predict import path
+from tests.archive import path
 
 DATA = Path(__file__).parent / 'fixtures' / 'extract'
 HMM = Path(__file__).parents[1] / 'data' / 'PF00406.hmm'
@@ -91,9 +91,7 @@ def test_annotation_to_adks_faa(tmp_path):
     (tmp_path / 'genome_list.txt').write_text(f'{genome}\n')
 
     tables = extract.run_annotation(tmp_path / 'genome_list.txt', HMM, jobs=1)
-    print("TABLES:", tables)
     written = extract.process_hmms(tmp_path)
-    print('WRITTEN:', written)
     adks = read(extract.concat_adks(tmp_path, tmp_path / 'adks.faa'))
     assert len(adks) == 1 and HEADER.match(adks[0].id)
     assert 'genomeB' == adks[0].id.split('|')[1]

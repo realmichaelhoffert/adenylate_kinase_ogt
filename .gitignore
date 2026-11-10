@@ -1,10 +1,10 @@
 *examples*
 *egg-info*
-*reference*
+/reference*
 *.ipynb_checkpoints*
 *__pycache__*
 *api_key.txt*
-*data*
+/data*
 *class_project/*
 old_environment.yaml
 *steinegger/*

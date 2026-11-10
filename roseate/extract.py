@@ -108,7 +108,6 @@ def concat_adks(loc, out='adks.faa', protein_name='adk'):
     Files are joined in sorted name order.
     '''
     with open(out, 'wb') as out_handle:
-        print('files found', glob.glob(os.path.join(loc, f'*_{protein_name}.faa')))
         for f in sorted(glob.glob(os.path.join(loc, f'*_{protein_name}.faa'))):
             with open(f, 'rb') as handle:
                 out_handle.write(handle.read())

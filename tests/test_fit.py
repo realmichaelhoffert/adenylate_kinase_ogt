@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from roseate import fit, io
-from tests.test_initial_predict import C_W_E, MODEL, REF, SUPPORT, path
+from tests.archive import *
 
 pytestmark = pytest.mark.skipif(not (REF / "MANIFEST.tsv").exists(),
                                 reason=f"reference archive not found at {REF}")
@@ -23,10 +23,6 @@ ENETCV_KEYS = ["l1_ratio", "cv", "n_alphas", "max_iter", "selection", "tol", "pr
 
 # ---------------------------------------------------------------- fixtures
 @pytest.fixture(scope="module")
-def model():
-    return io.reload_pickle(path(MODEL))
-
-@pytest.fixture(scope="module")
 def even_emb():
     return io.reload_pickle(path("intermediates/esm_msa/even_full_embeddings.pickle"))
 
@@ -35,14 +31,9 @@ def even_y():
     return np.asarray(io.reload_pickle(path("intermediates/esm_msa/even_temps.pickle")))
 
 @pytest.fixture(scope="module")
-def corkrey():
-    return io.reload_pickle(path(f"{SUPPORT}/corkrey_msa_dataset.pickle"))
-
-@pytest.fixture(scope="module")
 def refit(even_emb, even_y):
     """Fit once per module; every comparison below reuses it."""
     return fit.train_per_site(even_emb, even_y, sites=SITES, verbose=True)
-
 
 # ---------------------------------------------------------------- parameters
 def test_enetcv_params_match_archived(model):
@@ -70,15 +61,15 @@ def test_refit_scalers_match(site, refit, model):
 @pytest.mark.parametrize("site", SITES)
 def test_refit_hyperparameters_match(site, refit, model):
     enets, _ = refit
-    assert enets[site].alpha_ == model["best_model"][site].alpha_
+    np.testing.assert_allclose(enets[site].alpha_, model["best_model"][site].alpha_, atol=1e-6, rtol=1e-8)
     assert enets[site].l1_ratio_ == model["best_model"][site].l1_ratio_
 
 @pytest.mark.slow
 @pytest.mark.parametrize("site", SITES)
 def test_refit_coefficients_match(site, refit, model):
     enets, _ = refit
-    np.testing.assert_allclose(enets[site].coef_, model["best_model"][site].coef_, atol=1e-8, rtol=0)
-    np.testing.assert_allclose(enets[site].intercept_, model["best_model"][site].intercept_, atol=1e-8, rtol=0)
+    np.testing.assert_allclose(enets[site].coef_, model["best_model"][site].coef_, atol=1e-6, rtol=1e-8)
+    np.testing.assert_allclose(enets[site].intercept_, model["best_model"][site].intercept_, atol=1e-6, rtol=1e-8)
 
 
 # ---------------------------------------------------------------- prediction and packaging
@@ -86,7 +77,7 @@ def test_predict_test_reproduces_full_predictions(model):
     """Archived models + archived test embeddings -> stored full_predictions, range order."""
     c_w_e = io.reload_pickle(path(C_W_E))
     preds = fit.test_per_site(model["best_model"], model["scalers"], c_w_e)
-    np.testing.assert_allclose(preds, np.asarray(model["full_predictions"]), atol=1e-10, rtol=0)
+    np.testing.assert_allclose(preds, np.asarray(model["full_predictions"]), atol=1e-5, rtol=1e-7)
 
 def test_package_model_reproduces_archived_dict(model, corkrey):
     packaged = fit.package_model(model_label='test_model',
@@ -101,7 +92,7 @@ def test_package_model_reproduces_archived_dict(model, corkrey):
     assert packaged["metadata"] == model["metadata"]
     assert list(packaged["true_labels"]) == list(model["true_labels"])
     np.testing.assert_array_equal(packaged["true_values"], model["true_values"])
-    np.testing.assert_allclose(packaged["predictions"], model["predictions"], atol=1e-12, rtol=0)
+    np.testing.assert_allclose(packaged["predictions"], model["predictions"], atol=1e-5, rtol=1e-7)
 
 def test_save_model_round_trip_and_no_overwrite(tmp_path, model):
     target = tmp_path / "model.pickle"

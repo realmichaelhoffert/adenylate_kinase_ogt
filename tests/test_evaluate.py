@@ -14,7 +14,7 @@ from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.svm import SVR
 
 from roseate import evaluate, fit, io
-from tests.test_initial_predict import SUPPORT, path
+from tests.archive import *
 
 MEAN_MODEL = {'mean': lambda X, y: DummyRegressor().fit(X, y)}   # predicts the training mean
 PCV_RESULTS = 'outputs/predictive_models/supporting_data/taxonomic_cv_results.tsv*'

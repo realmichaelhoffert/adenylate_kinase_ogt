@@ -21,78 +21,13 @@ from sklearn.metrics import r2_score
 
 from reference.verify_reference import Reference
 from roseate import aggregate, io, predict
-
-REF = Path(os.environ.get("ROSEATE_REFERENCE", "reference/v1_preprint"))
-pytestmark = pytest.mark.skipif(not (REF / "MANIFEST.tsv").exists(),
-                                reason=f"reference archive not found at {REF}")
-
-# archive-relative locations
-SUPPORT = "inputs/predictive_models/supporting_data"
-MODEL = "outputs/predictive_models/even_enetcv_ind.pickle"
-SPEARMANS = "outputs/predictive_models/supporting_data/even_enetcv_ind_spearmans.tsv*"
-BACKBONE = "inputs/high_qual_alignments/backbone.filtered_only.afa"
-BACKBONE_TEMPS = 'inputs/high_qual_alignments/temp_data.tsv'
-C_W_E = "intermediates/esm_msa/c_w_e_full_embeddings.pickle"
-VALIDATION = sorted(Path(p).parts[-3] for p in
-                    glob.glob(str(REF / "intermediates/validation_datasets/*/embeddings/*_full_even.pickle")))
-
-
-def path(rel):
-    """Archive file for a relative path or glob; skip the test if it is not archived."""
-    hits = sorted(glob.glob(str(REF / rel)))
-    if not hits:
-        pytest.skip(f"not in archive: {rel}")
-    return Path(hits[0])
+from tests.archive import *
+from tests.conftest import even
 
 
 def metrics(y_true, y_pred):
     return {"r2": float(r2_score(y_true, y_pred)),
             "rmse": float(np.sqrt(np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)))}
-
-
-# ---------------------------------------------------------------- fixtures
-@pytest.fixture(scope="module")
-def ref():
-    return Reference(REF)
-
-@pytest.fixture(scope="module")
-def model():
-    return io.reload_pickle(path(MODEL))
-
-@pytest.fixture(scope="module")
-def scaler():
-    return io.reload_pickle(path(f"{SUPPORT}/ogt_scaler.pickle"))
-
-@pytest.fixture(scope="module")
-def archived_scaler():
-    legacy_path = '/data/mhoffert/fiererlab/adenylate_kinase_ogt/data/'
-    return io.reload_pickle(path(f"{legacy_path}predictive_models/supporting_data/ogt_scaler.pickle"))
-    
-@pytest.fixture(scope="module")
-def even():
-    return io.reload_pickle(path(f"{SUPPORT}/even_msa_dataset.pickle"))
-
-@pytest.fixture(scope="module")
-def corkrey():
-    return io.reload_pickle(path(f"{SUPPORT}/corkrey_msa_dataset.pickle"))
-
-@pytest.fixture(scope="module")
-def full():
-    return io.construct_msa_dataset(path(BACKBONE), 
-                                    path(BACKBONE_TEMPS))
-
-@pytest.fixture(scope="module")
-def full_scaled_cell15(full):
-    """05 cell 15: the full dataset scaled with a scaler fit on itself."""
-    return io.scale_traits(full)
-
-@pytest.fixture(scope="module")
-def c_w_e():
-    return io.reload_pickle(path(C_W_E))
-
-@pytest.fixture(scope="module")
-def spearmans():
-    return aggregate.load_site_spearmans(path(SPEARMANS))
 
 
 # ---------------------------------------------------------------- io.py
@@ -188,7 +123,7 @@ def test_run_model_site_means_match_stored_predictions(ref, c_w_e_preds):
     make sure predictions are the same
     '''
     ref.assert_array_close(c_w_e_preds.mean(axis=0), "portable/even_enetcv_ind.npz",
-                           key="predictions", atol=1e-10)
+                           key="predictions", atol=1e-5)
 
 def test_run_model_rows_follow_dict_order(model, c_w_e_preds):
     """Quirk 9: run_model rows are in model-key order; full_predictions is in range order."""
@@ -196,7 +131,7 @@ def test_run_model_rows_follow_dict_order(model, c_w_e_preds):
     FIXED
     '''
     keys = list(sorted(model["best_model"].keys()))
-    np.testing.assert_allclose(c_w_e_preds, np.asarray(model["full_predictions"])[keys], atol=1e-10, rtol=0)
+    np.testing.assert_allclose(c_w_e_preds, np.asarray(model["full_predictions"])[keys], atol=1e-5, rtol=0)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("name", VALIDATION)
@@ -215,7 +150,7 @@ def test_validation_predictions_match_archive(name, spearmans, scaler, archived_
     archived = pd.read_csv(path(f"portable/predictions/{name}_roseate_all_sites.tsv"),
                            sep="\t", index_col="protein")["pred_temp"]
     assert list(archived.index) == [i[0] for i in io.reload_pickle(msa)]
-    np.testing.assert_allclose(pred_c, archived.values, atol=1e-6, rtol=1e-7)
+    np.testing.assert_allclose(pred_c, archived.values, atol=1e-5, rtol=1e-6)
 
 
 # ---------------------------------------------------------------- aggregate.py

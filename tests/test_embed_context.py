@@ -13,10 +13,10 @@ import pytest
 
 from reference.verify_reference import Reference
 from roseate import context, embed, io
-from tests.test_initial_predict import MODEL, REF, SUPPORT, VALIDATION, path
+from tests.archive import MODEL, REF, SUPPORT, VALIDATION, path, requires_archive
+from tests.conftest import even
 
-pytestmark = pytest.mark.skipif(not (REF / "MANIFEST.tsv").exists(),
-                                reason=f"reference archive not found at {REF}")
+pytestmark = requires_archive
 
 ATOL = float(os.environ.get("ROSEATE_EMBED_ATOL", "1e-4"))   # set from the hardware gap you measure
 FULL = False #bool(os.environ.get("ROSEATE_FULL_EMBED"))
@@ -43,28 +43,17 @@ def embed_with_context(model, batch_converter, query, context_dataset, context_i
 
 
 # ---------------------------------------------------------------- fixtures
-@pytest.fixture(scope="module")
-def ref():
-    return Reference(REF)
 
-@pytest.fixture(scope="module")
-def even():
-    return io.reload_pickle(path(f"{SUPPORT}/even_msa_dataset.pickle"))
 
 @pytest.fixture(scope="module")
 def short_even():
     return io.reload_pickle(path(f"{SUPPORT}/even_msa_dataset.pickle"))[:10]
-    
-@pytest.fixture(scope="module")
-def corkrey():
-    return io.reload_pickle(path(f"{SUPPORT}/corkrey_msa_dataset.pickle"))
 
 @pytest.fixture(scope="module")
 def esm():
     model, _, batch_converter = embed.load_plm()
     model.eval()
     return model, batch_converter
-
 
 def pairs(dataset, indices):
     return [(dataset[i][0], dataset[i][1]) for i in indices]
