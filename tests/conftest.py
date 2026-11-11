@@ -19,8 +19,7 @@ def scaler():
 
 @pytest.fixture(scope="session")
 def archived_scaler():
-    legacy_path = '/data/mhoffert/fiererlab/adenylate_kinase_ogt/data/'
-    return io.reload_pickle(path(f"{legacy_path}predictive_models/supporting_data/ogt_scaler.pickle"))
+    return io.reload_pickle(path(f"{SUPPORT}/archived_ogt_scaler.pickle"))
     
 @pytest.fixture(scope="session")
 def even():

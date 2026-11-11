@@ -8,6 +8,7 @@ import json
 import subprocess
 import os
 import sys
+import shutil
 from importlib.metadata import version
 from pathlib import Path
 from roseate.decorators import *
@@ -30,6 +31,11 @@ def _sha256(path):
         for block in iter(lambda: f.read(1 << 20), b""):
             h.update(block)
     return h.hexdigest()
+
+def require_tools(*names):
+   missing = [n for n in names if shutil.which(n) is None]
+   if missing:
+       raise UsageError(f"missing external tools: {', '.join(missing)} (see roseate.yml)")
 
 def write_run_record(args, out_dir, inputs):
     '''
