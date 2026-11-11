@@ -9,13 +9,73 @@ import subprocess
 import os
 import sys
 import shutil
+import warnings
 from importlib.metadata import version
 from pathlib import Path
-from roseate.decorators import *
+import roseate.decorators
+
+## HELPING FUNCTIONS -----
+# ------------------------------------
 
 # arguments that must come from the command line or --config
-REQUIRED = {"predict": ["model", "emb", "msa_dataset", "scaler", "out"], 
-            'embed': ['embed_dataset', 'context_dataset', 'out']}
+REQUIRED = {"align":["out"],
+            "extract":["out"],
+            "embed": ["context_dataset", "out"],
+            "fit":["out"],
+            "predict": ["out"], 
+            
+            }
+
+# Layout of an output folder (--out):
+#   <out>/1_extract/ ... 4_predict/   one folder per stage
+#   <out>/models/<model>/             fitted models, written by `fit`, read by `embed` and `predict`
+
+RUN_FILES = {
+    'extract': {'proteins': '1_extract/proteins.faa'},
+    'align':   {'alignment': '2_align/protein_to_backbone.afa',
+                'msa_dataset': '2_align/protein_to_backbone.pickle'},
+    'embed':   { #'dataset': '3_embed/msa_dataset.pickle',
+                'contexts': '3_embed/contexts.npy',
+                'context_info': '3_embed/context_info.pickle',
+                'embeddings': '3_embed/embeddings.npy'},
+    'predict': {'predictions': '4_predict/predictions.tsv',
+                'per_site': '4_predict/per_site.npy'},
+}
+MODEL_FILES = {
+    'model': 'model.pickle',
+    'scaler': 'scaler.pickle',
+    'context_dataset': 'context_dataset.pickle',
+    'info': 'model.json',
+}
+
+def stage_file(out, stage, key):
+    '''
+    Path of one stage output, creating its folder: stage_file(out, 'embed', 'embeddings').
+    '''
+    path = Path(out) / RUN_FILES[stage][key]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+def input_file(given, out, stage, key, flag):
+    '''The path given with flag, else the earlier stage's output in the output folder; it must exist.'''
+    path = Path(given) if given else Path(out) / RUN_FILES[stage][key]
+    if not path.exists():
+        raise UsageError(f'{path} not found: pass {flag} or run `roseate {stage}` first')
+    return path
+
+def model_file(args, key):
+    '''
+    Path of one model file: <out>/models/<--model>/, or --model-dir for a model kept elsewhere.
+    '''
+    model_dir = args.model_dir or Path(args.out) / 'models' / args.model
+    return Path(model_dir) / MODEL_FILES[key]
+
+
+def done(paths, overwrite):
+    '''
+    True if every output already exists and --overwrite was not given, so the stage can be skipped.
+    '''
+    return not overwrite and all(Path(p).exists() for p in paths)
 
 class UsageError(Exception):
     '''Invalid argument combination, reported like an argparse error.'''
@@ -33,9 +93,12 @@ def _sha256(path):
     return h.hexdigest()
 
 def require_tools(*names):
-   missing = [n for n in names if shutil.which(n) is None]
-   if missing:
-       raise UsageError(f"missing external tools: {', '.join(missing)} (see roseate.yml)")
+    '''
+    Helper function to check for required tools
+    '''
+    missing = [n for n in names if shutil.which(n) is None]
+    if missing:
+        raise UsageError(f"missing external tools: {', '.join(missing)} (see roseate.yml)")
 
 def write_run_record(args, out_dir, inputs):
     '''
@@ -53,8 +116,82 @@ def write_run_record(args, out_dir, inputs):
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     # write json dataload to dir
     (Path(out_dir) / "run.json").write_text(json.dumps(record, indent=2))
+
+## MAIN MODULES -----
+# ------------------------------------
+
+
+@roseate.decorators.verbose_print
+def cmd_extract(args, vprint):
+
+    import roseate.extract
     
-@verbose_print
+    require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+    out = stage_file(args.out, 'extract', 'proteins')
+    if done([out], args.overwrite):
+        warnings.warn(f"extract: specify --overwrite to overwrite existing file {out}")
+        print("Nothing to do.")
+        return
+
+    # To do: reformat this to better handle errors and avoid intermediates
+    # call proteins and run hmm on proteins
+    with roseate.decorators.spinner('Annotating', enabled=args.verbose):
+        tables = roseate.extract.run_annotation(genome_list=args.genome_list, 
+                                                hmm_model=args.hmm, 
+                                                jobs=args.threads)
+
+    # process hmm table to make per-genome protein file
+    with roseate.decorators.spinner('Processing tables',   enabled=args.verbose):
+        written = roseate.extract.process_hmms(loc=Path(tables[0]).parent, 
+                                               protein_name=args.protein_name,
+                                               n_proteins=args.n_proteins,
+                                               min_score=args.bitscore,
+                                               write_file=True)
+    vprint(f'Processed {len(written)} tables.')
+    # currently assumes all files are in the same directory,
+    # adk name is hard-coded
+    file = roseate.extract.concat_adks(loc=Path(tables[0]).parent, 
+                                       out=out, 
+                                       protein_name=args.protein_name)
+    with open(file, "rb") as f:
+        count = sum(1 for line in f if line.startswith(b">"))
+    vprint(f'Wrote {count} proteins to {out}')
+
+    # record args
+    write_run_record(args, Path(args.out).parent, [args.genome_list, args.hmm])
+
+
+
+@roseate.decorators.verbose_print
+def cmd_align(args, vprint):
+
+    from roseate import align, io
+    
+    require_tools('mafft', 'mmseqs')
+    protein_file = args.proteins or input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
+    backbone = args.backbone
+    out = stage_file(args.out, 'align', 'alignment')
+    if done([out], args.overwrite):
+        warnings.warn(f"align: specify --overwrite to overwrite existing file {out}")
+        print("Nothing to do.")
+        return
+    
+    # insert sequences into alignment
+    with roseate.decorators.spinner('Aligning to backbone', enabled=args.verbose):
+        aligned = align.add_to_backbone(protein_file, backbone, out)
+        added_ids = align.added_ids(aligned, backbone)
+        vprint(f"Added {len(added_ids)} sequences.")
+    
+    # save MSA dataset
+    msa_dataset = io.construct_msa_dataset(aligned)
+    msa_out = stage_file(args.out, 'align', 'msa_dataset')
+    io.save_pickle(msa_dataset, msa_out)
+
+    # run record
+    write_run_record(args, Path(args.out).parent, [args.proteins, args.backbone])
+
+    
+@roseate.decorators.verbose_print
 def cmd_embed(args, vprint):
     '''
     run embed command
@@ -65,13 +202,15 @@ def cmd_embed(args, vprint):
     import numpy as np
     from pathlib import Path
     from roseate import io, context, embed
+
     
     # load msa dataset
-    with spinner('Loading MSA dataset', enabled=args.verbose):
-        embed_dataset = io.reload_pickle(args.embed_dataset)
+    msa = args.embed_dataset or input_file(args.embed_dataset, args.out, 'align', 'alignment', '--embed-dataset')
+    with roseate.decorators.spinner('Loading MSA dataset', enabled=args.verbose):
+        embed_dataset = io.reload_pickle(msa)
     vprint(f"{len(embed_dataset)} sequences loaded for embedding.")
 
-    with spinner('Loading MSA dataset', enabled=args.verbose):
+    with roseate.decorators.spinner('Loading MSA dataset', enabled=args.verbose):
         context_dataset = io.reload_pickle(args.context_dataset)
     vprint(f"{len(context_dataset)} sequences loaded for context.")
     
@@ -94,21 +233,21 @@ def cmd_embed(args, vprint):
         assert not any([i in ctx[i] for i in range(len(ctx))]), 'found own index in context'
     # save
     if args.save:
-        outpath = Path(args.out) / 'context.pickle'
+        outpath = stage_file(args.out, 'embed', 'context')
         io.save_pickle(ctx, outpath)
 
         info = {'context_seed':args.context_seed,
                'context_size':args.context_size,
                'context_dataset':args.context_dataset,
                'context_dataset_sha256':_sha256(args.context_dataset)}
-        outpath = Path(args.out) / 'context_info.pickle'
+        outpath = stage_file(args.out, 'embed', 'context_info')
         io.save_pickle(info, outpath)
         
         vprint(f'Saved context and info to {Path(args.out)}.')
 
     # load transformer
-    with spinner('Loading MSA Transformer', enabled=args.verbose):
-        model, alphabet, conv = embed.load_plm()
+    with decorators.spinner('Loading MSA Transformer', enabled=args.verbose):
+        model, _, conv = embed.load_plm()
     layer = model.num_layers if args.layer == -1 else args.layer
         
     # generate embeddings
@@ -119,15 +258,15 @@ def cmd_embed(args, vprint):
                               context_dataset = context_dataset,
                               context_inds = ctx,
                               layer = layer,
-                               return_mean = False)    
+                              return_mean = False)    
     vprint(f'Embeddings generated: shape {emb.shape}')
-    outpath = Path(args.out) / 'embeddings.pickle'
+    outpath = stage_file(args.out, 'embed', 'embeddings')
     io.save_pickle(emb, outpath)
     np.save(outpath.replace('.pickle', '.npy'), emb)
     vprint(f'Embeddings saved to {outpath}')
     write_run_record(args, Path(args.out).parent, [args.embed_dataset, args.context_dataset, args.context_seed, args.context_size, args.exclude_self])
     
-@verbose_print
+@roseate.decorators.verbose_print
 def cmd_predict(args, vprint):
     '''
     Run PREDICT command
@@ -181,21 +320,39 @@ def build_parser():
     sub = p.add_subparsers(dest="command", required=True)
     subs = {}
 
+    # extract
+    sub_extract = subs['extract'] = sub.add_parser('extract', help='Extract proteins')
+    input_args = sub_extract.add_argument_group("Input arguments")
+    input_args.add_argument('--genome-list', type=Path, help="Newline delimited file or location of genomes or samples for prediction")
+    input_args.add_argument('-hmm', type=Path, help='HMM for annotating proteins',
+                            default=Path(__file__).parents[1] / 'data' / 'PF00406.hmm')
+    input_args.add_argument('--n-proteins', type=int, default=100, help='max proteins per genome')
+    input_args.add_argument('--bitscore', type=float, default=100, help='minimum bitscore')
+    sub_extract.set_defaults(func=cmd_extract)
+
+
+    # align
+    sub_align = subs["align"] = sub.add_parser("align", help="Align protein to backbone to make MSA Dataset")
+    input_args = sub_align.add_argument_group("Input arguments")
+    input_args.add_argument('--proteins',
+                            type=Path, help='Path to file of unaligned proteins')
+    input_args.add_argument('--backbone',
+                            type=Path, help='Path to MSA file of proteins')
+    sub_align.set_defaults(func=cmd_align)
+
     # embed
     sub_embed = subs["embed"] = sub.add_parser("embed", help="Generate embeddings from MSA dataset")
     input_args = sub_embed.add_argument_group("Input arguments")
     input_args.add_argument("--embed-dataset", type=Path, help="Path to pickled MSADataset to embed")
     input_args.add_argument("--context-dataset", type=Path, help="Path to pickled MSADataset for context")
-    input_args.add_argument("--out", type=Path)
     embedding_args = sub_embed.add_argument_group("Embedding arguments")
     embedding_args.add_argument("--layer", type=int, default=-1, 
                                 help="Layer of model, default -1 (last)")
-    context_args = sub_embed.add_argument_group("Embedding arguments")
+    context_args = sub_embed.add_argument_group("Context arguments")
     context_args.add_argument("--exclude-self", action='store_true', 
                               help='Flag if dataset uses itself for embedding context')
     context_args.add_argument("--context-size", type=int, default=8)
     context_args.add_argument('--context-seed', type=int, default=1234)
-    
     sub_embed.set_defaults(func=cmd_embed)
     
     # predict 
@@ -209,14 +366,17 @@ def build_parser():
     sub_pred.add_argument("--spearmans", type=Path, help="site Spearman TSV, for --sites legacy_fig2a")
     sub_pred.add_argument("--cutoff", type=float, default=0.84, help='sites to use, spearman R cutoff')
     sub_pred.add_argument("--per-site", type=Path, help="also save the (protein_len, n) per-site predictions")
-    sub_pred.add_argument("--out", type=Path)
     sub_pred.set_defaults(func=cmd_predict)
 
     # extract, align, embed, fit, run, reproduce: same pattern, one cmd_* each
     for s in subs.values():
+        s.add_argument('-o', '--out', type=Path, help='Output location')
+        s.add_argument('-p', '--protein-name', required=True, type=str, help='protein prefix (for multiple proteins)')
         s.add_argument("--config", type=Path, help="YAML defaults; command-line flags override")
-        s.add_argument("-v", "--verbose", action="store_true", help="print progress")
-        s.add_argument("-s", "--save", action="store_true", help="Whether to save intermediate files")
+        s.add_argument("-v", "--verbose", action="store_true", help="Enable vebosity")
+        s.add_argument("-s", "--save", action="store_true", help="Save intermediate files")
+        s.add_argument('--overwrite', action="store_true", help="Overwrite existing outputs")
+        s.add_argument('--threads', type=int, help='Number of threads')
     return p, subs
 
 

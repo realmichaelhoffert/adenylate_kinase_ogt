@@ -22,14 +22,14 @@ pfam_table_columns = ['target_name', 'target_accession', 'query_name', 'query_ac
                       'best_domain_e_value', 'best_domain_score', 'best_domain_bias',
                       'exp', 'reg', 'clu', 'ov', 'env', 'dom', 'rep', 'inc', 'description_of_target']
 
-
+# Todo: add metagenome / isolate flag
 def run_annotation(genome_list, hmm_model, jobs=4, script=ANNOTATION_SCRIPT):
     '''
     Gene calling (prodigal -p meta) and hmmsearch for every genome in genome_list,
     one genome FASTA path per line (.fa, .fasta, optionally .gz).
     Runs scripts/run_esm_pipeline.sh unchanged; needs seqtk, prodigal, hmmer and GNU parallel.
-    Outputs are written next to each genome. Returns the hmmsearch tables.
-    Success is judged by the outputs, not the exit code.
+    Outputs are written next to each genome. 
+    Returns: a list of the hmmsearch tables.
     '''
     result = subprocess.run(['bash', str(script), '--genome-list', str(genome_list),
                              '--hmm-model', str(hmm_model), '--jobs', str(jobs)],
@@ -62,10 +62,8 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
     '''
     For every *.tbl under loc, keep the n_proteins best hits with full_score >= min_score and
     write them from {genome}_proteins.faa to {genome}_adk.faa (existing files are not overwritten).
-    Headers are 'protein|genome|XXXtemp=XXX|bitscore=score'. Kept from v1:
-      - genome is the .tbl file name up to '_PF', i.e. usually '{genome}_hmmsearch.tbl'
-      - 'XXXtemp=XXX' (a missing comma in v1, quirk 7)
-    Returns the list of _adk.faa files written.
+    Headers are 'protein|genome|bitscore=score'.
+    Returns the list of _{protein_name}.faa files written.
     '''
     hmm_files = sorted(glob.glob(os.path.join(loc, '**/*.tbl'), recursive=True))
     print(f'Found {len(hmm_files)} tables to parse')
@@ -95,10 +93,11 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
             new_id = '|'.join([r.id.split(' # ')[0], genome, protein_name, f'bitscore={gene2score[r.id]}'])
             r.id = r.description = new_id
         outfile = file.replace('_hmmsearch.tbl', f'_{protein_name}.faa')
-        if not os.path.exists(outfile):
-            with open(outfile, 'w') as out_handle:
-                SeqIO.write(records, out_handle, 'fasta')
-            written.append(outfile)
+        # if not os.path.exists(outfile):
+        with open(outfile, 'w') as out_handle:
+            SeqIO.write(records, out_handle, 'fasta')
+        written.append(outfile)
+    
     return written
 
 
@@ -107,8 +106,10 @@ def concat_adks(loc, out='adks.faa', protein_name='adk'):
     Concatenate {genome}_adk.faa files in loc into one FASTA (iso: 'cat ./genomes/*_adk.faa > adks.faa').
     Files are joined in sorted name order.
     '''
+    
     with open(out, 'wb') as out_handle:
         for f in sorted(glob.glob(os.path.join(loc, f'*_{protein_name}.faa'))):
             with open(f, 'rb') as handle:
-                out_handle.write(handle.read())
+                data = handle.read()
+                out_handle.write(data)
     return out
