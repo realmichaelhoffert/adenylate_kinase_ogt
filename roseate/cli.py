@@ -123,7 +123,7 @@ def cmd_embed(args, vprint):
     vprint(f'Embeddings generated: shape {emb.shape}')
     outpath = Path(args.out) / 'embeddings.pickle'
     io.save_pickle(emb, outpath)
-    np.save(outpath.replace('.pickle', '.npy'), emb)
+    np.save(outpath.with_suffix('.npy'), emb)
     vprint(f'Embeddings saved to {outpath}')
     write_run_record(args, Path(args.out).parent, [args.embed_dataset, args.context_dataset, args.context_seed, args.context_size, args.exclude_self])
     
