@@ -183,7 +183,7 @@ def cmd_align(args, vprint):
         vprint(f"Added {len(added_ids)} sequences.")
     
     # save MSA dataset
-    msa_dataset = io.construct_msa_dataset(aligned)
+    msa_dataset = [i for i in io.construct_msa_dataset(aligned) if i[0] in added_ids]
     msa_out = stage_file(args.out, 'align', 'msa_dataset')
     io.save_pickle(msa_dataset, msa_out)
 
@@ -201,11 +201,16 @@ def cmd_embed(args, vprint):
     import warnings
     import numpy as np
     from pathlib import Path
-    from roseate import io, context, embed
+    from roseate import io, context, embed, decorators
 
+    embed_out = stage_file(args.out, 'embed', 'embeddings')
+    if done([embed_out], args.overwrite):
+        warnings.warn(f"align: specify --overwrite to overwrite existing file {embed_out}")
+        print("Nothing to do.")
+        return
     
     # load msa dataset
-    msa = args.embed_dataset or input_file(args.embed_dataset, args.out, 'align', 'alignment', '--embed-dataset')
+    msa = args.embed_dataset or input_file(args.embed_dataset, args.out, 'align', 'msa_dataset', '--embed-dataset')
     with roseate.decorators.spinner('Loading MSA dataset', enabled=args.verbose):
         embed_dataset = io.reload_pickle(msa)
     vprint(f"{len(embed_dataset)} sequences loaded for embedding.")
@@ -217,7 +222,7 @@ def cmd_embed(args, vprint):
     # check requested context size
     assert args.context_size < len(context_dataset) - 1, "Context size can't be larger than context MSA"
     # check self_exclude
-    if (_sha256(args.embed_dataset) == _sha256(args.context_dataset)) and not args.exclude_self:
+    if (_sha256(msa) == _sha256(args.context_dataset)) and not args.exclude_self:
         warnings.warn("embedding and context dataset sha256 match - are you sure you don't want --exclude-self?")
 
     # get context
@@ -233,7 +238,7 @@ def cmd_embed(args, vprint):
         assert not any([i in ctx[i] for i in range(len(ctx))]), 'found own index in context'
     # save
     if args.save:
-        outpath = stage_file(args.out, 'embed', 'context')
+        outpath = stage_file(args.out, 'embed', 'contexts')
         io.save_pickle(ctx, outpath)
 
         info = {'context_seed':args.context_seed,
@@ -252,7 +257,7 @@ def cmd_embed(args, vprint):
         
     # generate embeddings
     print('Embedding:')
-    emb = embed.get_embeddings(model=model, 
+    emb, _, _ = embed.get_embeddings(model=model, 
                               batch_converter=conv, 
                               data_to_embed = embed_dataset,
                               context_dataset = context_dataset,
@@ -264,7 +269,9 @@ def cmd_embed(args, vprint):
     io.save_pickle(emb, outpath)
     np.save(outpath.with_suffix('.npy'), emb)
     vprint(f'Embeddings saved to {outpath}')
-    write_run_record(args, Path(args.out).parent, [args.embed_dataset, args.context_dataset, args.context_seed, args.context_size, args.exclude_self])
+
+    # save info
+    write_run_record(args, Path(args.out).parent, [msa, args.context_dataset, str(args.context_seed), str(args.context_size), args.exclude_self])
     
 @roseate.decorators.verbose_print
 def cmd_predict(args, vprint):
