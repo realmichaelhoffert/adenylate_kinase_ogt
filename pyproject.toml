@@ -7,6 +7,16 @@ name = "roseate"
 version = "0.1.0"
 requires-python = ">=3.10"
 
+dependencies = [
+   "numpy<2",                     # scikit-learn 1.4.1 predates numpy 2
+   "pandas",
+   "scipy",
+   "scikit-learn==1.4.1.post1",   # pinned: the archived pickles need it
+   "biopython",
+   "joblib",
+   "tqdm",
+   "pyyaml",
+]
 [project.scripts]
 roseate = "roseate.cli:main"
 
@@ -21,17 +31,6 @@ include-package-data = false
 pythonpath = ["."]
 testpaths = ["tests"]
 markers = ["slow: loads large embedding files"]
-
-dependencies = [
-   "numpy<2",                     # scikit-learn 1.4.1 predates numpy 2
-   "pandas",
-   "scipy",
-   "scikit-learn==1.4.1.post1",   # pinned: the archived pickles need it
-   "biopython",
-   "joblib",
-   "tqdm",
-   "pyyaml",
-]
 
 [project.optional-dependencies]
 embed = ["torch", "fair-esm==2.0.0"]
