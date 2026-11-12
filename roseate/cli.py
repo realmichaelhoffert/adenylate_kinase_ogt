@@ -10,6 +10,7 @@ import os
 import sys
 import shutil
 import warnings
+from datetime import datetime
 from importlib.metadata import version
 from pathlib import Path
 import numpy as np
@@ -90,20 +91,22 @@ def require_tools(*names):
 
 def write_run_record(args, out_dir, inputs):
     '''
-    Create a file that describes what commands were run and with what outputs
+    Append a record of this command to <out_dir>/run.jsonl, one JSON object per line,
+    so the records of all stages accumulate in order instead of overwriting each other.
+    Read them with pandas.read_json(path, lines=True).
     '''
-    # make record dict
     record = {
+        "stage": args.command,
+        "time": datetime.now().isoformat(timespec="seconds"),
         "command": sys.argv,
         "args": {k: str(v) for k, v in vars(args).items() if k != "func"},
         "versions": {p: version(p) for p in ("numpy", "pandas", "scikit-learn", "fair-esm")},
         "git": subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
         "inputs": {str(p): _sha256(p) for p in inputs if p and Path(p).is_file()},
     }
-    # make dir if not made
     Path(out_dir).mkdir(parents=True, exist_ok=True)
-    # write json dataload to dir
-    (Path(out_dir) / "run.json").write_text(json.dumps(record, indent=2))
+    with open(Path(out_dir) / "run.jsonl", "a") as f:
+        f.write(json.dumps(record) + "\n")
 
 ## MAIN MODULES -----
 # ------------------------------------
@@ -355,7 +358,7 @@ def cmd_predict(args, vprint):
 
     out = stage_file(args.out, 'predict', 'predictions')
     if done([out], args.overwrite):
-        warnings.warn(f"predict: specify --overwire to overwrite existing file {out}")
+        warnings.warn(f"predict: specify --overwrite to overwrite existing file {out}")
         print("Nothing to do.")
         return
     
@@ -363,8 +366,8 @@ def cmd_predict(args, vprint):
     with roseate.decorators.spinner('Loading inputs', enabled=args.verbose):
         model_path = input_file(args.model, args.out, 'fit', 'model', '--model')
         scaler_path = input_file(args.scaler, args.out, 'fit', 'scaler', '--scaler')
-        emb_path = input_file(args.emb, args.out, 'embed', 'embeddings', '--train-emb')
-        msa_path = input_file(args.msa_dataset, args.out, 'align', 'msa_dataset', '--train-dataset')
+        emb_path = input_file(args.emb, args.out, 'embed', 'embeddings', '--emb')
+        msa_path = input_file(args.msa_dataset, args.out, 'align', 'msa_dataset', '--msa-dataset')
 
     with roseate.decorators.spinner('Predicting', enabled=args.verbose):
         # construct predictions
@@ -470,7 +473,7 @@ def build_parser():
     # extract, align, embed, fit, run, reproduce: same pattern, one cmd_* each
     for s in subs.values():
         s.add_argument('-o', '--out', type=Path, help='Output location')
-        s.add_argument('-p', '--protein-name', required=True, type=str, help='protein prefix (for multiple proteins)')
+        s.add_argument('-p', '--protein-name', default='adk', type=str, help='protein prefix (for multiple proteins)')
         s.add_argument("--config", type=Path, help="YAML defaults; command-line flags override")
         s.add_argument("-v", "--verbose", action="store_true", help="Enable vebosity")
         s.add_argument("-s", "--save", action="store_true", help="Save intermediate files")
