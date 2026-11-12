@@ -153,7 +153,7 @@ def load_embeddings(path : str) -> np.ndarray:
     '''
     Load embeddings saved either as .npy or .pickle
     '''
-    return np.load(path) if str(path).endswidth('.npy') else np.asarray(reload_pickle(path))
+    return np.load(path) if str(path).endswith('.npy') else np.asarray(reload_pickle(path))
 
 
 def attach_traits(msa_dataset : MSADataset, trait_data : str) -> MSADataset:
@@ -164,7 +164,7 @@ def attach_traits(msa_dataset : MSADataset, trait_data : str) -> MSADataset:
     traits = pd.read_csv(trait_data, sep=None, engine='python', index_col=0).iloc[:, 0].dropna()
     missing = [i[0] for i in msa_dataset if not i[0] in traits.index]
     assert not missing, f'{len(missing)} sequences have no trait data: {"\n".join(missing[:3])}\n...'
-    reutrn [(i[0], i[1], traits.loc[i[0]]) for i in msa_dataset]
+    return [(i[0], i[1], traits.loc[i[0]]) for i in msa_dataset]
 
 
 def subset_corkrey(dataset : MSADataset,

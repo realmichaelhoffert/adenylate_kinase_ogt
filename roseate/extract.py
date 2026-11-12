@@ -58,7 +58,7 @@ def read_pfam_table_pandas(file_path):
     return table
 
 
-def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_file=True):
+def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_file=True, overwrite=False):
     '''
     For every *.tbl under loc, keep the n_proteins best hits with full_score >= min_score and
     write them from {genome}_proteins.faa to {genome}_adk.faa (existing files are not overwritten).
@@ -93,9 +93,9 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
             new_id = '|'.join([r.id.split(' # ')[0], genome, protein_name, f'bitscore={gene2score[r.id]}'])
             r.id = r.description = new_id
         outfile = file.replace('_hmmsearch.tbl', f'_{protein_name}.faa')
-        # if not os.path.exists(outfile):
-        with open(outfile, 'w') as out_handle:
-            SeqIO.write(records, out_handle, 'fasta')
+        if overwrite:
+            with open(outfile, 'w') as out_handle:
+                SeqIO.write(records, out_handle, 'fasta')
         written.append(outfile)
     
     return written
