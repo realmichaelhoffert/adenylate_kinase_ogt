@@ -25,6 +25,7 @@ import numpy as np
 MSADataset = list[tuple]
 # get_ogt = lambda _str: float(_str.split('temp=')[-1].split('|')[0])
 
+
 def construct_msa_dataset(file : str,
                           trait_data : str = None) -> MSADataset:
     '''
@@ -67,6 +68,7 @@ def construct_msa_dataset(file : str,
             seqs_with_trait[r.id] = (str(r.seq), np.nan)
     return [(k, item[0], item[1]) for k, item in seqs_with_trait.items()]
 
+
 def save_split(dataset, path, dataset_name):
     '''
     Save a subset of the data
@@ -78,6 +80,7 @@ def save_split(dataset, path, dataset_name):
 
     with open(os.path.join(path, f'{dataset_name}_ids.pickle'), 'wb') as handle:
         pickle.dump([i[0] for i in dataset], handle)
+
 
 def load_new_dataset(afa_file : str, 
                      scaler : StandardScaler, 
@@ -99,6 +102,7 @@ def load_new_dataset(afa_file : str,
     scaled_msa_dataset, _ = scale_traits(msa_dataset, scaler)
     return scaled_msa_dataset
 
+
 # trait scaling 
 def scale_traits(msa_dataset : MSADataset, scaler : StandardScaler = None) -> MSADataset:
     '''
@@ -118,11 +122,13 @@ def scale_traits(msa_dataset : MSADataset, scaler : StandardScaler = None) -> MS
     scaled_msa_dataset = [(msa_dataset[i][0], msa_dataset[i][1], scaled_traits[i]) for i in range(len(msa_dataset))]
     return scaled_msa_dataset, _scaler
 
+
 def unscale_traits(trait_list, scaler : StandardScaler) -> list:
     """
     function to unscale data given a scaler
     """
     return scaler.inverse_transform(np.array(trait_list).reshape(1, -1))[0]
+
 
 def save_pickle(obj, path : str) -> None:
     """
@@ -132,6 +138,7 @@ def save_pickle(obj, path : str) -> None:
     with open(path, 'wb') as handle:
         pickle.dump(obj, handle)
 
+
 def reload_pickle(path : str) -> dict:
     """
     Code to reload models saved as pickles
@@ -140,6 +147,24 @@ def reload_pickle(path : str) -> dict:
     with open(path, 'rb') as handle:
         model_data = pickle.load(handle)
     return model_data
+
+
+def load_embeddings(path : str) -> np.ndarray:
+    '''
+    Load embeddings saved either as .npy or .pickle
+    '''
+    return np.load(path) if str(path).endswidth('.npy') else np.asarray(reload_pickle(path))
+
+
+def attach_traits(msa_dataset : MSADataset, trait_data : str) -> MSADataset:
+    '''
+    Attach a trait dataset to an MSADataset
+    traits: same as construct_msa_dataset
+    '''
+    traits = pd.read_csv(trait_data, sep=None, engine='python', index_col=0).iloc[:, 0].dropna()
+    missing = [i[0] for i in msa_dataset if not i[0] in traits.index]
+    assert not missing, f'{len(missing)} sequences have no trait data: {"\n".join(missing[:3])}\n...'
+    reutrn [(i[0], i[1], traits.loc[i[0]]) for i in msa_dataset]
 
 
 def subset_corkrey(dataset : MSADataset,

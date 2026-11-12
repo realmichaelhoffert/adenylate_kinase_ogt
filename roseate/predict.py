@@ -1,6 +1,6 @@
 import numpy as np
 from tqdm import tqdm
-from roseate.io import reload_pickle
+from roseate.io import reload_pickle, load_embeddings
 
 def run_model(
               embedding_loc : str, 
@@ -9,13 +9,13 @@ def run_model(
               predict_fn):
 
     '''
-    embedding loc: location of pickled embeddings
+    embedding loc: location of pickled embeddings (.npy or pickle)
     model_loc: location of model to use
     msa_loc: location of msa used to generate embeddings
     predict_fn: function used to generate predictions
     '''
     loaded_model = reload_pickle(model_loc)
-    loaded_embeddings = reload_pickle(embedding_loc)
+    loaded_embeddings = load_embeddings(embedding_loc)
     loaded_msa_dataset = reload_pickle(msa_loc)
 
     # make sure loaded embeddings match embeddings data was run on

@@ -68,3 +68,13 @@ def good_cols(col_rs, cutoff):
 def cv_site_scores(models):
     '''Best mean cross-validation MSE per site, from training folds only (lower is better).'''
     return pd.Series({site: m.mse_path_.mean(axis=-1).min() for site, m in models.items()})
+
+def cv_top_sites(models, n_sites):
+    '''
+    Row positions of the n_sites sites with the lowest training cross-validation error,
+    for mean_sites on predictions from per_site_predict (rows in sorted site order).
+    '''
+    assert 0 < n_sites <= len(models), f'n_sites must be between 1 and {len(models)}'
+    best = cv_site_scores(models).nsmallest(n_sites).index
+    order = sorted(models)
+    return np.array(sorted(order.index(site) for site in best))
