@@ -279,31 +279,76 @@ def cmd_fit(args, vprint):
     roseate fit
     '''
 
-#     from roseate import fit, io
+    from roseate import fit, io
 
-#     # check outputs
-#     model_out = stage_file(args.out, 'fit', 'model')
-#     scaler_out = stage_file(args.out, 'fit', 'scaler')
-#     if done([model_out, scaler_out], args.overwrite):
-#         warnings.warn('fit: specify --overwrite to overwrite existing file {model_out}")')
-#         print('Nothing to do.')
-#         return
+    # check outputs
+    model_out = stage_file(args.out, 'fit', 'model')
+    scaler_out = stage_file(args.out, 'fit', 'scaler')
+    if done([model_out, scaler_out], args.overwrite):
+        warnings.warn('fit: specify --overwrite to overwrite existing file {model_out}")')
+        print('Nothing to do.')
+        return
 
-#     # dummy code for using existing model
-#     if args.model:
-#         if args.scaler is None:
-#             raise UsageError('Scaler is required')
-#         model = io.reload_pickle(args.model)
-#         if not all(i in model.keys() for i in ['best_model', 'metadata']):
-#             raise UsageError('Is this a roseate model?')
+    # dummy code for using existing model
+    if args.model:
+        if args.scaler is None:
+            raise UsageError('Scaler is required')
+        model = io.reload_pickle(args.model)
+        if not all(i in model.keys() for i in ['best_model', 'metadata']):
+            raise UsageError('Is this a roseate model?')
 
-#         shutil.copy(args.model, model_out)
-#         shutil.copy(args.scaler, scaler_out)
+        shutil.copy(args.model, model_out)
+        shutil.copy(args.scaler, scaler_out)
         
-#         vprint(f'Copied existing model and scaler to {args.out}.')
-#         write_run_record(args, Path(args.out), [args.model, args.scaler])
-#         return
+        vprint(f'Copied existing model and scaler to {args.out}.')
+        write_run_record(args, Path(args.out), [args.model, args.scaler])
+        return
+
+    # new model
+    if args.traits is None:
+        raise UsageError('Traits (--traits) must be specified to fit a model or use --model')
     
+    # load model
+    with roseate.decorators.spinner('Loading model', enabled=args.verbose):
+        train_emb_path = input_file(args.train_emb, args.out, 'embed', 'embeddings', '--train-emb')
+        train_ds_path = input_file(args.train_dataset, args.out, 'align', 'msa_dataset', '--train-dataset')
+
+        train_emb = io.load_embeddings(train_emb_path)
+        train_ds = io.attach_traits(io.reload_pickle(train_ds_path), args.traits)
+        # check match on embeddings and dataset
+        assert train_emb.shape[0] == len(train_ds), f"Lengths of embedding and msa should match: {train_emb.shape[0]} != {train_ds}"
+        
+        # scaler for scaling traits, used if provided, otherwise fitted from training
+        scaler = io.reload_pickle(args.scaler) if args.scaler else None
+        train_ds, scaler = io.scale_traits(train_ds, scaler)
+        vprint('Loaded.')
+
+    vprint(f'Fitting {train_emb.shape[1]} sites on {len(train_ds)} sequences.')
+    enets, scalers = fit.train_per_site(train_emb, np.array([i[2] for i in train_ds]), verbose=args.verbose)
+
+    # optional test set
+    inputs = [train_emb_path, train_ds_path, args.traits, args.scaler]
+    test_traits = args.test_traits or args.traits
+    if args.test_emb:
+        if args.test_dataset is None:
+            raise UsageError("--test-dataset is required with --test-emb")
+        test_ds, _ = io.scale_traits(io.attach_traits(io.reload_pickle(args.test_dataset), test_traits), scaler)
+        test_preds = fit.test_per_site(enets, scalers, io.load_embeddings(args.test_emb))
+        inputs += [args.test_emb, args.test_dataset, test_traits]
+    else:
+        test_ds, test_preds = [], np.empty((len(enets), 0))
+
+    model = fit.package_model(model_label = args.model_label or Path(args.out).name,
+                             enets = enets, scalers=scalers,
+                             test_preds=test_preds, test_dataset=test_ds,
+                             input_shape=train_emb.shape, model_type='per-site ElasticNetCV',
+                             extra_metadata={'enetcv_params': fit.ENETCV_PARAMS,
+                                              'train_dataset': str(train_ds_path),
+                                              'traits': str(args.traits)})
+    fit.save_model(model, model_out, overwrite=args.overwrite)
+    io.save_pickle(scaler, scaler_out)
+    vprint(f"Saved model and scaler to {model_out.parent}")
+    write_run_record(args, Path(args.out), inputs)
     
 
 @roseate.decorators.verbose_print
@@ -421,6 +466,8 @@ def build_parser():
     train_args.add_argument("--traits", type=Path, help="Exact matching table of trait values for seq ids in --train-dataset")
     train_args.add_argument("--train-emb", type=Path, help="Embeddings of training dataset")
     train_args.add_argument("--train-dataset", type=Path, help="Pickled training MSA dataset")
+    train_args.add_argument("--test-traits", type=Path,
+                        help="Trait table for --test-dataset; default: --traits")
     train_args.add_argument("--test-emb", type=Path, help="Optional: testing dataset embeddings")
     train_args.add_argument("--test-dataset", type=Path, help="Optional: Testing MSA Dataset")
     train_args.add_argument("--model-label", type=Path, help="label stored in model metadata")
