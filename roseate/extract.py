@@ -93,7 +93,7 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
             new_id = '|'.join([r.id.split(' # ')[0], genome, protein_name, f'bitscore={gene2score[r.id]}'])
             r.id = r.description = new_id
         outfile = file.replace('_hmmsearch.tbl', f'_{protein_name}.faa')
-        if overwrite or no os.path.exists(outfile):
+        if overwrite or not os.path.exists(outfile):
             with open(outfile, 'w') as out_handle:
                 SeqIO.write(records, out_handle, 'fasta')
             written.append(outfile)
