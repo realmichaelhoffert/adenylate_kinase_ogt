@@ -85,6 +85,18 @@ def load_legacy_context(context_path : str,
     indices = context_to_indices(context, msa_dataset)
     return indices
 
+def load_contexts(path, n_queries, n_context_seqs, exclude_self=False):
+    """
+    Load an existing context array
+    """
+    ctx = np.load(path)
+    assert len(ctx.shape) == 2 and np.issubdtype(ctx.dtype, np.integer), f'Expected a 2D integer array'
+    assert ctx.shape[0] == n_queries, f'Loaded context of shape {ctx.shape} must match n_queries'
+    assert ctx.min() >= 0 and ctx.max() < n_context_seqs, f"Loaded context indices must be between 0 and {n_context_seqs}"
+    if exclude_self:
+        assert not np.any(ctx == np.arange(n_queries)[:, None]), f'{path}: a sequence is in its own context'
+    return ctx
+
 def context_to_indices(ctx, dataset, allow_oversampling=False):
     """
     Saved get_embeddings contexts are lists of (id, seq); convert to integer indices.

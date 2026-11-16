@@ -211,18 +211,30 @@ def test_extract_then_align(tmp_path):
 
 # ---------------------------------------------------------------- embed
 @pytest.mark.slow
-def test_embed_writes_embeddings_and_contexts(tmp_path):
+def test_embed_with_saved_contexts_reproduces_embeddings(tmp_path):
+    '''Embed with sampled contexts, then again from the saved contexts: the embeddings must be identical.'''
     pytest.importorskip('esm')
     rows = list(SeqIO.parse(BACKBONE, 'fasta'))[:12]
     dataset = [(r.id, str(r.seq), np.nan) for r in rows]
     io.save_pickle(dataset[:3], tmp_path / 'embed_ds.pickle')
     io.save_pickle(dataset[3:], tmp_path / 'context_ds.pickle')
-    out = tmp_path / 'run'
+    inputs = ['--embed-dataset', tmp_path / 'embed_ds.pickle', '--context-dataset', tmp_path / 'context_ds.pickle']
 
-    run('embed', '-o', out, '--embed-dataset', tmp_path / 'embed_ds.pickle',
-        '--context-dataset', tmp_path / 'context_ds.pickle', '--context-size', 4, '--context-seed', 0)
+    # first run: contexts sampled with a seed, saved with their settings
+    first = tmp_path / 'first'
+    run('embed', '-o', first, *inputs, '--context-size', 4, '--context-seed', 0)
+    emb = np.load(stage(first, 'embed', 'embeddings'))
+    contexts = stage(first, 'embed', 'contexts')
+    assert emb.shape == (3, len(rows[0].seq) + 1, 768)           # +1 for the CLS position
+    assert np.load(contexts).shape == (3, 4)
+    assert io.reload_pickle(stage(first, 'embed', 'context_info'))['context_seed'] == 0
 
-    emb = np.load(stage(out, 'embed', 'embeddings'))
-    assert emb.shape == (3, len(rows[0].seq) + 1, 768)          # +1 for the CLS position
-    assert np.load(stage(out, 'embed', 'contexts')).shape == (3, 4)
-    assert list(records(out)['stage']) == ['embed']
+    # second run: the saved contexts replace sampling (a different seed must not matter)
+    second = tmp_path / 'second'
+    run('embed', '-o', second, *inputs, '--contexts', contexts, '--context-seed', 99)
+    np.testing.assert_array_equal(np.load(stage(second, 'embed', 'contexts')), np.load(contexts))
+    np.testing.assert_array_equal(np.load(stage(second, 'embed', 'embeddings')), emb)
+
+    info = io.reload_pickle(stage(second, 'embed', 'context_info'))
+    assert info['contexts_file'] == str(contexts) and 'context_seed' not in info
+    assert str(contexts) in records(second)['inputs'].iloc[-1]
