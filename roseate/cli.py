@@ -216,18 +216,31 @@ def cmd_embed(args, vprint):
     # check self_exclude
     if (_sha256(msa) == _sha256(args.context_dataset)) and not args.exclude_self:
         warnings.warn("embedding and context dataset sha256 match - are you sure you don't want --exclude-self?")
-
-    # get context
-    ctx = context.get_random_context(msa_dataset=context_dataset,
-                        n_contexts=len(embed_dataset), 
-                        context_size=args.context_size,
-                        self_exclude=args.exclude_self,
-                        seed = args.context_seed)
-    optional = ' excluding self from context' if args.exclude_self else ''
-    vprint(f'Generated contexts: shape {np.array(ctx).shape}' + optional)
+    # if context should be reloaded
+    if args.contexts:
+        vprint("Reloading contexts...")
+        ctx = np.load(args.contexts)
+        vprint(f"Loaded existing context indices with depth of {contexts.shape[1]}.")
+        self_excluded = any([i in ctx[i] for i in range(len(ctx))])
+        msg = 'Self appears to be ' + 'not' if self_excluded else ''
+        vprint(msg)
+        # check context indices
+        assert all(i for c in ctx for )
+        
+    else:
+        
+        # get context
+        ctx = context.get_random_context(msa_dataset=context_dataset,
+                            n_contexts=len(embed_dataset), 
+                            context_size=args.context_size,
+                            self_exclude=args.exclude_self,
+                            seed = args.context_seed)
+        optional = ' excluding self from context' if args.exclude_self else ''
+        vprint(f'Generated contexts: shape {np.array(ctx).shape}' + optional)
     # check self arg
     if args.exclude_self:
         assert not any([i in ctx[i] for i in range(len(ctx))]), 'found own index in context'
+    
     # save
     # if args.save:
     outpath = stage_file(args.out, 'embed', 'contexts')
@@ -430,6 +443,7 @@ def build_parser():
     sub_embed = subs["embed"] = sub.add_parser("embed", help="Generate embeddings from MSA dataset")
     input_args = sub_embed.add_argument_group("Input arguments")
     input_args.add_argument("--embed-dataset", type=Path, help="Path to pickled MSADataset to embed")
+    input_args.add_argument('--contexts', type=Path, help="Path to existing context dataset")
     input_args.add_argument("--context-dataset", type=Path, help="Path to pickled MSADataset for context")
     embedding_args = sub_embed.add_argument_group("Embedding arguments")
     embedding_args.add_argument("--layer", type=int, default=-1, 
