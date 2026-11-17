@@ -68,7 +68,7 @@ def get_random_context(msa_dataset : MSADataset,
     return contexts
 
 def load_legacy_context(context_path : str,
-                       context_dataset):
+                       context_dataset : MSADataset) -> np.array:
     '''
     reload context
     context_path: path to pickle of context list

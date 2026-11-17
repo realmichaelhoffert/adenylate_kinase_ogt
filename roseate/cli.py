@@ -276,7 +276,11 @@ def cmd_embed(args, vprint):
     vprint(f'Embeddings saved to {outpath}')
 
     # save info
-    write_run_record(args, Path(args.out), [msa, args.context_dataset, str(args.context_seed), str(args.context_size), args.contexts, args.exclude_self])
+    write_run_record(args, Path(args.out), [msa, 
+                                            args.context_dataset, 
+                                            str(args.context_seed), 
+                                            str(args.context_size), 
+                                            args.contexts, str(args.exclude_self)])
     
 @roseate.decorators.verbose_print
 def cmd_fit(args, vprint):
