@@ -12,6 +12,7 @@ echo "Running from: $SCRIPT_DIR"
 echo "Repo root: $REPO_ROOT"
 
 # Default values
+MODE="meta"
 GENOME_LIST=""
 HMM_MODEL=""
 
@@ -22,6 +23,7 @@ usage() {
     echo "Usage: $0 --genome-list FILE --hmm-model FILE [--jobs N]"
     echo ""
     echo "  --genome-list FILE   File with one genome FASTA path per line (.fa, .fasta, .gz allowed)"
+    echo "  --mode MODE         prodigal mode: meta (default) or single"
     echo "  --hmm-model FILE   File of hmm model to run against genomes"
     echo "  --jobs N             Number of parallel jobs (default: 4)"
     exit 1
@@ -32,6 +34,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --genome-list)
             GENOME_LIST="$2"
+            shift 2
+            ;;
+        --mode)
+            MODE="$2"
             shift 2
             ;;
         --jobs)
@@ -67,6 +73,11 @@ if [[ -n "$HMM_MODEL" && ! -f "$HMM_MODEL" ]]; then
     exit 1
 fi
 
+if [[ "$MODE" != "meta" && "$MODE" != "single" ]]; then
+    echo "Error: --mode must be 'meta' or 'single', not '$MODE'."
+    exit 1
+fi
+
 # Function to run prodigal on one genome
 run_prodigal() {
     genome="$1"
@@ -90,7 +101,7 @@ run_prodigal() {
              -a "${base}_proteins.faa" \
              -d "${base}_proteins.fna" \
              -o "${base}_prodigal_output.gbk" \
-             -p meta
+             -p "$MODE"
 
     # Optionally run hmmsearch
     if [[ -n "$HMM_MODEL" ]]; then
@@ -103,6 +114,7 @@ run_prodigal() {
 
 export -f run_prodigal
 export HMM_MODEL
+export MODE
 
 # Run in parallel
 parallel -j "$JOBS" run_prodigal :::: "$GENOME_LIST"
