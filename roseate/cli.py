@@ -292,6 +292,7 @@ def cmd_fit(args, vprint):
     import numpy as np
     from threadpoolctl import threadpool_limits, threadpool_info
     from roseate import fit, io
+    os.environ['OPENBLAS_NUM_THREADS'] = str(1)
 
     # check outputs
     model_out = stage_file(args.out, 'fit', 'model')
@@ -334,8 +335,8 @@ def cmd_fit(args, vprint):
         scaler = io.reload_pickle(args.scaler) if args.scaler else None
         train_ds, scaler = io.scale_traits(train_ds, scaler)
 
-    sites = list(range(16)) if args.test_mode else None
-    site_count = 1 if args.test_mode else train_emb.shape[1]
+    sites = list(range(2)) if args.test_mode else None
+    site_count = len(sites) if args.test_mode else train_emb.shape[1]
     vprint(f'Fitting {site_count} sites on {len(train_ds)} sequences.')
     with threadpool_limits(limits=1):      # one BLAS/OpenMP thread per ElasticNetCV job
         enets, scalers = fit.train_per_site(train_emb, np.array([i[2] for i in train_ds]),
