@@ -1,0 +1,16 @@
+# configs/adk.yaml: ROSEATE adenylate kinase model (preprint, v1). Paths are relative to this file.
+extract:
+  protein_name: adk
+  hmm: ../data/PF00406.hmm
+  bitscore: 100
+align:
+  backbone: ../data/high_qual_alignments/backbone.filtered_only.afa
+embed:
+  context_dataset: ../models/v1_preprint/context_dataset.pickle
+  context_size: 8
+  layer: -1
+fit:
+  model: ../models/v1_preprint/model.pickle
+  scaler: ../models/v1_preprint/scaler.pickle
+predict:
+  sites: all
