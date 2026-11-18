@@ -253,17 +253,25 @@ def test_extract_needs_exactly_one_input(argv, tmp_path):
     with pytest.raises(SystemExit):
         run('extract', '-o', tmp_path / 'run', *argv)
 
-def test_align_aligned_input_keeps_every_sequence(tmp_path):
+def test_align_train_ids_selects_backbone_rows(tmp_path):
     rows = list(SeqIO.parse(BACKBONE, 'fasta'))[:20]
-    SeqIO.write(rows, tmp_path / 'train.afa', 'fasta')
+    SeqIO.write(rows, tmp_path / 'backbone.afa', 'fasta')
+    picked = [rows[i] for i in (3, 1, 7, 12, 19)]                 # listed out of order on purpose
+    (tmp_path / 'train_ids.txt').write_text('\n'.join(r.id for r in picked) + '\n')
     out = tmp_path / 'run'
-    run('align', '-o', out, '--proteins', tmp_path / 'train.afa', '--aligned', '--backbone', BACKBONE)
+    run('align', '-o', out, '--backbone', tmp_path / 'backbone.afa', '--train-ids', tmp_path / 'train_ids.txt')
     dataset = io.reload_pickle(stage(out, 'align', 'msa_dataset'))
-    assert [(i[0], i[1]) for i in dataset] == [(r.id, str(r.seq)) for r in rows]
-    assert stage(out, 'align', 'alignment').read_text() == (tmp_path / 'train.afa').read_text()
+    expected = [rows[i] for i in (1, 3, 7, 12, 19)]                # backbone order
+    assert [(i[0], i[1]) for i in dataset] == [(r.id, str(r.seq)) for r in expected]
+    assert stage(out, 'align', 'alignment').read_text() == (tmp_path / 'backbone.afa').read_text()
 
-def test_align_aligned_rejects_unaligned_input(tmp_path, capsys):
-    (tmp_path / 'bad.afa').write_text('>a\nMK-L\n>b\nMKL\n')
+@pytest.mark.parametrize('extra, message', [
+    (['--train-ids', 'IDS'], 'are not in'),                          # an ID missing from the backbone
+    (['--train-ids', 'IDS', '--proteins', 'p.faa'], 'ive --proteins (new seqs) or --train-ids'),     # two scenarios at once
+])
+def test_align_train_ids_errors(extra, message, tmp_path, capsys):
+    (tmp_path / 'ids.txt').write_text('not_a_backbone_id\n')
+    extra = [str(tmp_path / 'ids.txt') if e == 'IDS' else e for e in extra]
     with pytest.raises(SystemExit):
-        run('align', '-o', tmp_path / 'run', '--proteins', tmp_path / 'bad.afa', '--aligned')
-    assert 'not an alignment' in capsys.readouterr().err
+        run('align', '-o', tmp_path / 'run', '--backbone', BACKBONE, *extra)
+    assert message in capsys.readouterr().err

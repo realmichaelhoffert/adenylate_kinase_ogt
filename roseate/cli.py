@@ -187,14 +187,19 @@ def cmd_extract(args, vprint):
 
 @roseate.decorators.verbose_print
 def cmd_align(args, vprint):
+    '''
+    roseate align --backbone B [--proteins P]    prediction: add new proteins P to B with MAFFT
+    roseate align --backbone B --train-ids IDS   training: rows of B listed in IDS, no MAFFT
+    Either way 2_align/protein_to_backbone.afa holds all of B (plus any new proteins).
+    '''
 
     from roseate import align, io, decorators
     from Bio import SeqIO
     
-    # require_tools('mafft')
-    protein_file = input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
-    if not args.aligned and args.backbone is None:
-        raise UsageError('--backbone is required (or use --aligned for input that is already aligned)')
+    if args.proteins and args.train_ids:
+        raise UsageError('give --proteins (new seqs) or --train-ids (rows of backbone for training)')
+
+
     out = stage_file(args.out, 'align', 'alignment')
     if done([out], args.overwrite):
         warnings.warn(f"align: specify --overwrite to overwrite existing file {out}")
@@ -202,42 +207,33 @@ def cmd_align(args, vprint):
         return
     
     if args.train_ids:
-        # if sequences are already aligned, check, copy and keep all seqs
-        # records = list(SeqIO.parse(protein_file, 'fasta'))
-        # widths = {len(r.seq) for r in records}
-        # if len(widths) != 1:
-        #     raise UsageError(f'{protein_file}: sequences differ in length: is this an alignment?')
-        # if len({r.id for r in records}) < len(records):
-        #     raise UsageError(f'{protein_file}: sequence ids (first space-delimited header element) must be unique')
-        # if args.backbone and widths != {len(next(SeqIO.parse(args.backbone, 'fasta')).seq)}:
-        #     # raise UsageError('f{pr}')
-        #     ''
-        # shutil.copy(protein_file, out)
-        # msa_dataset = io.construct_msa_dataset(args.backbone)
-        # if args.train_ids:
+
         keep = set(Path(args.train_ids).read_text().split())
         records =  list(SeqIO.parse(args.backbone, 'fasta'))
-
         missing = keep - {r.id for r in records}
         if missing:
             raise UsageError(f'{len(missing)} IDs in {args.train_ids} are not in {args.backbone}')
-        train_records = [r for r in records if r.id in keep]
-        SeqIO.write(train_records, out, 'fasta')  
-        vprint(f'Using {len(msa_dataset)} aligned sequences from {protein_file}')
+        shutil.copy(args.backbone, out)
+        # train ids used to subset dataset
+        msa_dataset = [i for i in io.construct_msa_dataset(out) if i[0] in keep]
+        vprint(f'Using {len(msa_dataset)} aligned sequences from {args.backbone}')
+        inputs = [args.backbone, args.train_ids]
     else:
         require_tools('mafft')
+        protein_file = input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
         # insert sequences into alignment
         with roseate.decorators.spinner('Aligning to backbone', enabled=args.verbose):
             aligned = align.add_to_backbone(protein_file, args.backbone, out)
             added_ids = align.added_ids(aligned, args.backbone)
         vprint(f"Added {len(added_ids)} sequences.")
         msa_dataset = [i for i in io.construct_msa_dataset(aligned) if i[0] in added_ids]
-    
+        inputs = [protein_file, args.backbone]
+
     # save MSA dataset
     io.save_pickle(msa_dataset, stage_file(args.out, 'align', 'msa_dataset'))
 
     # run record
-    write_run_record(args, Path(args.out), [protein_file, args.backbone])
+    write_run_record(args, Path(args.out), inputs)
 
     
 @roseate.decorators.verbose_print
@@ -505,10 +501,10 @@ def build_parser():
     sub_align = subs["align"] = sub.add_parser("align", help="Align protein to backbone to make MSA Dataset")
     input_args = sub_align.add_argument_group("Input arguments")
     input_args.add_argument('--proteins',
-                            type=Path, help='Path to file of unaligned proteins')
+                            type=Path, help='Prediction: unaligned proteins to insert into backbone')
     input_args.add_argument('--backbone',
-                            type=Path, help='Path to MSA file of proteins')
-    input_args.add_argument('--train-ids', type=Path, help='IDs to use in training')
+                            type=Path, help="Model's alignment: path to fasta MSA file used for training or addition")
+    input_args.add_argument('--train-ids', type=Path, help='Training (instead of proteins): newline-delimited file of backbone IDs for training')
     sub_align.set_defaults(func=cmd_align)
 
     # embed
