@@ -190,8 +190,8 @@ def cmd_embed(args, vprint):
     Usage:
     roseate embed
     '''
-    import warnings
     import numpy as np
+    import warnings
     from pathlib import Path
     from roseate import io, context, embed, decorators
 
@@ -289,7 +289,8 @@ def cmd_fit(args, vprint):
     Usage:
     roseate fit
     '''
-    from threadpoolctl import threadpool_limits
+    import numpy as np
+    from threadpoolctl import threadpool_limits, threadpool_info
     from roseate import fit, io
 
     # check outputs
@@ -333,12 +334,12 @@ def cmd_fit(args, vprint):
         scaler = io.reload_pickle(args.scaler) if args.scaler else None
         train_ds, scaler = io.scale_traits(train_ds, scaler)
 
-    sites = [0] if args.test_mode else None
+    sites = list(range(16)) if args.test_mode else None
     site_count = 1 if args.test_mode else train_emb.shape[1]
     vprint(f'Fitting {site_count} sites on {len(train_ds)} sequences.')
     with threadpool_limits(limits=1):      # one BLAS/OpenMP thread per ElasticNetCV job
         enets, scalers = fit.train_per_site(train_emb, np.array([i[2] for i in train_ds]),
-                                            verbose=args.verbose, n_jobs=args.threads)
+                                            verbose=args.verbose, sites=sites, n_jobs=args.threads)
 
     # optional test set
     inputs = [train_emb_path, train_ds_path, args.traits, args.scaler]
@@ -373,7 +374,7 @@ def cmd_predict(args, vprint):
     roseate predict 
     Uses various inputs
     '''
-    
+    import numpy as np
     import pandas as pd
     from roseate import aggregate, io, predict
 
@@ -521,6 +522,10 @@ def main(argv=None):
     for name in REQUIRED.get(args.command, []):
         if getattr(args, name) is None:
             parser.error(f"--{name.replace('_', '-')} is required (on the command line or in --config)")
+    
+    for var in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS'):
+        os.environ[var] = str(args.threads)
+    
     try:
         return args.func(args)
     except UsageError as e:
