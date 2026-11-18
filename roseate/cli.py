@@ -25,6 +25,8 @@ REQUIRED = {"align":["out", "backbone"],
             "embed": ["context_dataset", "out"],
             "fit":["out"],
             "predict": ["out"], 
+            "prediction-workflow": ["out"],
+            "fitting-workflow": ["out", "alignment", "train_ids", "traits"],
             
             }
 
@@ -477,6 +479,87 @@ def cmd_predict(args, vprint):
     # record what happened
     write_run_record(args, Path(args.out), [model_path, scaler_path, emb_path, msa_path])
 
+# ---------------------------------------------------------------- workflows
+# Each workflow runs its stages in order in one output folder.
+WORKFLOWS = {
+    'prediction-workflow': ['extract', 'align', 'embed', 'fit', 'predict'],   # fit copies the configured model
+    'fitting-workflow':    ['align', 'embed', 'fit'],
+}
+CONFIG_DIR = Path(__file__).parents[1] / 'configs'
+
+def parse_setting(item):
+    '''
+    embed.context_size=16 -> ('embed', 'context_size', '16')
+    '''
+    target, sep, value = item.partition('=')
+    stage, dot, key = target.partition('.')
+    if not (sep and dot) or stage not in RUN_FILES:
+        raise UsageError(f'--set {item}: expected STAGE.OPTION=VALUE with STAGE one of {", ".join(RUN_FILES)}')
+    return stage, key.replace('-', '_'), value
+    
+
+def workflow_inputs(args):
+    '''
+    args for the workflows
+    '''
+    if args.command == 'prediction-workflow':
+        if args.genomes:
+            return {'extract': ['--genome-list', args.genomes, '--mode', 'single']}
+        if args.metagenomes:
+            return {'extract':['--genome-list', args.metagenomes, '--mode', 'meta', '--n-proteins', 1000]}
+        return {'extract':['--protein-fasta', args.proteins]}
+    dataset = Path(args.out) / RUN_FILES['align']['msa_dataset']
+    return {'align': ['--backbone', args.alignment, '--train-ids', args.train_ids],
+            'embed': ['--context-dataset', dataset, '--exclude-self'],
+            'fit':   ['--traits', args.traits]  + (['--scaler', args.scaler] if args.scaler else [])}
+
+def cmd_workflow(args):
+    '''
+    run a workflow in one output folder
+    each stage runs exactly as though called with roseate [stage] -o OUT --config CONFIG
+    options are:
+    prediction-workflow: predict with the model
+    fitting-workflow: fit a model
+    '''
+    config = args.config or CONFIG_DIR / f'{args.protein}.yaml'
+    if not Path(config).exists():
+        raise UsageError(f'config not found: {config}')
+    inputs = workflow_inputs(args)
+    settings = [parse_setting(item) for item in args.set or []]
+    for stage in WORKFLOWS[args.command]:
+        argv = [stage, '-o', args.out, '--threads', args.threads]
+        if not (args.command == 'fitting-workflow' and stage == 'fit'):
+            argv += ['--config', config]
+        argv += inputs.get(stage, [])
+        argv += [a for s, key, value in settings if s == stage for a in (f"=={key.replace('_', '-')}", value)]
+        argv += ['--verbose'] * args.verbose + ['--overwrite'] * args.overwrite
+        main([str(a) for a in argv])
+    if args.command == 'fitting-workflow':
+        write_model_config(config, args, settings)
+
+def write_model_config(config, args, settings):
+    '''
+    Write <out>/model_config.yaml: the base config with this run's backbone, context dataset,
+    model and scaler, and any embed settings given with --set. Paths are absolute.
+    Use it with: roseate prediction-workflow --config <out>/model_config.yaml ...
+    '''
+    import yaml
+    out = Path(args.out).resolve()
+    _, subs = build_parser()
+    with open(config) as f:
+        stages = [s for s in (yaml.safe_load(f) or {}) if s in RUN_FILES]
+    model_config = {s: load_config_section(config, s, subs[s]) for s in stages}
+    for stage, key, value in settings:
+        if stage == 'embed':                       # prediction must embed the same way as training
+            model_config.setdefault('embed', {})[key] = yaml.safe_load(value)
+    model_config.setdefault('align', {})['backbone'] = out / RUN_FILES['align']['alignment']
+    model_config.setdefault('embed', {})['context_dataset'] = out / RUN_FILES['align']['msa_dataset']
+    model_config['fit'] = {'model': out / RUN_FILES['fit']['model'], 'scaler': out / RUN_FILES['fit']['scaler']}
+    as_text = {s: {k: str(v) if isinstance(v, Path) else v for k, v in section.items()}
+               for s, section in model_config.items()}
+    with open(out / 'model_config.yaml', 'w') as f:
+        yaml.safe_dump(as_text, f, sort_keys=False)
+
 
 def build_parser():
     p = argparse.ArgumentParser(prog="roseate")
@@ -553,6 +636,31 @@ def build_parser():
     sub_pred.add_argument("--cutoff", type=float, default=0.84, help='sites to use, spearman R cutoff')
     sub_pred.add_argument("--per-site", action="store_true", help="Save the (protein_len, n) per-site predictions")
     sub_pred.set_defaults(func=cmd_predict)
+
+        # workflows
+    sub_pw = subs['prediction-workflow'] = sub.add_parser(
+        'prediction-workflow', help='Predict with a fitted model: extract, align, embed, fit (copy), predict')
+    sub_pw.add_argument('protein', nargs='?', default='adk',
+                        help='Model to use: configs/<protein>.yaml (default: adk); ignored with --config')
+    pw_inputs = sub_pw.add_argument_group('Input (exactly one)').add_mutually_exclusive_group(required=True)
+    pw_inputs.add_argument('--genomes', type=Path, help='File listing genome FASTA paths (prodigal single-genome mode)')
+    pw_inputs.add_argument('--metagenomes', type=Path, help='File listing metagenome assembly paths (prodigal metagenome mode)')
+    pw_inputs.add_argument('--proteins', type=Path, help='Protein FASTA; sequences are checked against the HMM')
+
+    sub_fw = subs['fitting-workflow'] = sub.add_parser(
+        'fitting-workflow', help='Fit a model on rows of an alignment: align, embed, fit; writes model_config.yaml')
+    sub_fw.add_argument('protein', nargs='?', default='adk',
+                        help='Base config for embedding settings and the HMM: configs/<protein>.yaml; ignored with --config')
+    fw_inputs = sub_fw.add_argument_group('Inputs')
+    fw_inputs.add_argument('--alignment', type=Path, help='Backbone alignment the model is trained on')
+    fw_inputs.add_argument('--train-ids', type=Path, help='Backbone rows to train on, one ID per line')
+    fw_inputs.add_argument('--traits', type=Path, help='Trait table for the training rows')
+    fw_inputs.add_argument('--scaler', type=Path, help='Optional trait scaler, e.g. to reproduce a published model')
+
+    for s in (sub_pw, sub_fw):
+        s.add_argument('--set', action='append', metavar='STAGE.OPTION=VALUE',
+                       help='Option for one stage, e.g. --set embed.context_size=16 (repeatable)')
+        s.set_defaults(func=cmd_workflow)
 
     # extract, align, embed, fit, run, reproduce: same pattern, one cmd_* each
     for s in subs.values():
