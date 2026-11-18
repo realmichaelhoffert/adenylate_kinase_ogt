@@ -189,26 +189,52 @@ def cmd_extract(args, vprint):
 def cmd_align(args, vprint):
 
     from roseate import align, io, decorators
+    from Bio import SeqIO
     
-    require_tools('mafft')
+    # require_tools('mafft')
     protein_file = input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
-    backbone = args.backbone
+    if not args.aligned and args.backbone is None:
+        raise UsageError('--backbone is required (or use --aligned for input that is already aligned)')
     out = stage_file(args.out, 'align', 'alignment')
     if done([out], args.overwrite):
         warnings.warn(f"align: specify --overwrite to overwrite existing file {out}")
         print("Nothing to do.")
         return
     
-    # insert sequences into alignment
-    with roseate.decorators.spinner('Aligning to backbone', enabled=args.verbose):
-        aligned = align.add_to_backbone(protein_file, backbone, out)
-        added_ids = align.added_ids(aligned, backbone)
+    if args.train_ids:
+        # if sequences are already aligned, check, copy and keep all seqs
+        # records = list(SeqIO.parse(protein_file, 'fasta'))
+        # widths = {len(r.seq) for r in records}
+        # if len(widths) != 1:
+        #     raise UsageError(f'{protein_file}: sequences differ in length: is this an alignment?')
+        # if len({r.id for r in records}) < len(records):
+        #     raise UsageError(f'{protein_file}: sequence ids (first space-delimited header element) must be unique')
+        # if args.backbone and widths != {len(next(SeqIO.parse(args.backbone, 'fasta')).seq)}:
+        #     # raise UsageError('f{pr}')
+        #     ''
+        # shutil.copy(protein_file, out)
+        # msa_dataset = io.construct_msa_dataset(args.backbone)
+        # if args.train_ids:
+        keep = set(Path(args.train_ids).read_text().split())
+        records =  list(SeqIO.parse(args.backbone, 'fasta'))
+
+        missing = keep - {r.id for r in records}
+        if missing:
+            raise UsageError(f'{len(missing)} IDs in {args.train_ids} are not in {args.backbone}')
+        train_records = [r for r in records if r.id in keep]
+        SeqIO.write(train_records, out, 'fasta')  
+        vprint(f'Using {len(msa_dataset)} aligned sequences from {protein_file}')
+    else:
+        require_tools('mafft')
+        # insert sequences into alignment
+        with roseate.decorators.spinner('Aligning to backbone', enabled=args.verbose):
+            aligned = align.add_to_backbone(protein_file, args.backbone, out)
+            added_ids = align.added_ids(aligned, args.backbone)
         vprint(f"Added {len(added_ids)} sequences.")
+        msa_dataset = [i for i in io.construct_msa_dataset(aligned) if i[0] in added_ids]
     
     # save MSA dataset
-    msa_dataset = [i for i in io.construct_msa_dataset(aligned) if i[0] in added_ids]
-    msa_out = stage_file(args.out, 'align', 'msa_dataset')
-    io.save_pickle(msa_dataset, msa_out)
+    io.save_pickle(msa_dataset, stage_file(args.out, 'align', 'msa_dataset'))
 
     # run record
     write_run_record(args, Path(args.out), [protein_file, args.backbone])
@@ -482,6 +508,7 @@ def build_parser():
                             type=Path, help='Path to file of unaligned proteins')
     input_args.add_argument('--backbone',
                             type=Path, help='Path to MSA file of proteins')
+    input_args.add_argument('--train-ids', type=Path, help='IDs to use in training')
     sub_align.set_defaults(func=cmd_align)
 
     # embed

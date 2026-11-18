@@ -252,3 +252,18 @@ def test_extract_protein_fasta_keeps_all_and_warns(tmp_path):
 def test_extract_needs_exactly_one_input(argv, tmp_path):
     with pytest.raises(SystemExit):
         run('extract', '-o', tmp_path / 'run', *argv)
+
+def test_align_aligned_input_keeps_every_sequence(tmp_path):
+    rows = list(SeqIO.parse(BACKBONE, 'fasta'))[:20]
+    SeqIO.write(rows, tmp_path / 'train.afa', 'fasta')
+    out = tmp_path / 'run'
+    run('align', '-o', out, '--proteins', tmp_path / 'train.afa', '--aligned', '--backbone', BACKBONE)
+    dataset = io.reload_pickle(stage(out, 'align', 'msa_dataset'))
+    assert [(i[0], i[1]) for i in dataset] == [(r.id, str(r.seq)) for r in rows]
+    assert stage(out, 'align', 'alignment').read_text() == (tmp_path / 'train.afa').read_text()
+
+def test_align_aligned_rejects_unaligned_input(tmp_path, capsys):
+    (tmp_path / 'bad.afa').write_text('>a\nMK-L\n>b\nMKL\n')
+    with pytest.raises(SystemExit):
+        run('align', '-o', tmp_path / 'run', '--proteins', tmp_path / 'bad.afa', '--aligned')
+    assert 'not an alignment' in capsys.readouterr().err
