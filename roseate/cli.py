@@ -128,7 +128,8 @@ def cmd_extract(args, vprint):
     # call proteins and run hmm on proteins
     with roseate.decorators.spinner('Annotating', enabled=args.verbose):
         tables = roseate.extract.run_annotation(genome_list=args.genome_list, 
-                                                hmm_model=args.hmm, 
+                                                hmm_model=args.hmm,
+                                                mode=args.mode,
                                                 jobs=args.threads)
 
     # process hmm table to make per-genome protein file
@@ -438,6 +439,8 @@ def build_parser():
                             default=Path(__file__).parents[1] / 'data' / 'PF00406.hmm')
     input_args.add_argument('--n-proteins', type=int, default=1, help='max proteins per genome')
     input_args.add_argument('--bitscore', type=float, default=100, help='minimum bitscore')
+    input_args.add_argument('--mode', type=str, choices=['meta', 'single'], default='meta',
+                           help='prodigal mode for ORF calling: meta for metagenomes and contings, single for whole genomes')
     sub_extract.set_defaults(func=cmd_extract)
 
 

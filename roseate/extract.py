@@ -23,16 +23,16 @@ pfam_table_columns = ['target_name', 'target_accession', 'query_name', 'query_ac
                       'exp', 'reg', 'clu', 'ov', 'env', 'dom', 'rep', 'inc', 'description_of_target']
 
 # Todo: add metagenome / isolate flag
-def run_annotation(genome_list, hmm_model, jobs=4, script=ANNOTATION_SCRIPT):
+def run_annotation(genome_list, hmm_model, mode='meta', jobs=4, script=ANNOTATION_SCRIPT):
     '''
-    Gene calling (prodigal -p meta) and hmmsearch for every genome in genome_list,
+    Gene calling (prodigal -p {mode}) and hmmsearch for every genome in genome_list,
     one genome FASTA path per line (.fa, .fasta, optionally .gz).
     Runs scripts/run_esm_pipeline.sh unchanged; needs seqtk, prodigal, hmmer and GNU parallel.
     Outputs are written next to each genome. 
     Returns: a list of the hmmsearch tables.
     '''
     result = subprocess.run(['bash', str(script), '--genome-list', str(genome_list),
-                             '--hmm-model', str(hmm_model), '--jobs', str(jobs)],
+                             '--hmm-model', str(hmm_model), '--jobs', str(jobs), '--mode', str(mode)],
                             capture_output=True, text=True)
     tables = []
     for genome in Path(genome_list).read_text().split():
