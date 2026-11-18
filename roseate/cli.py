@@ -21,7 +21,7 @@ import roseate.decorators
 
 # arguments that must come from the command line or --config
 REQUIRED = {"align":["out", "backbone"],
-            "extract":["out", "genome_list"],
+            "extract":["out"],
             "embed": ["context_dataset", "out"],
             "fit":["out"],
             "predict": ["out"], 
@@ -32,7 +32,8 @@ REQUIRED = {"align":["out", "backbone"],
 #   <out>/1_extract/ 2_align/ 3_embed/ 4_fit/ 5_predict/
 # 4_fit always holds the model used by predict, whether fitted here or copied in.
 RUN_FILES = {
-    'extract': {'proteins': '1_extract/proteins.faa'},
+    'extract': {'proteins': '1_extract/proteins.faa',
+                'hmm_check':'1_extract/hmm_check.tsv'},
     'align':   {'alignment': '2_align/protein_to_backbone.afa',
                 'msa_dataset': '2_align/protein_to_backbone.pickle'},
     'embed':   {'contexts': '3_embed/contexts.npy',
@@ -115,17 +116,46 @@ def write_run_record(args, out_dir, inputs):
 @roseate.decorators.verbose_print
 def cmd_extract(args, vprint):
 
+    from Bio import SeqIO
     import roseate.extract
     
-    require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+    # require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+    if bool(args.genome_list) == bool(args.protein_fasta):
+        raise UsageError('Only give one of --genome-list  or --protein-fasta')
     out = stage_file(args.out, 'extract', 'proteins')
+
     if done([out], args.overwrite):
         warnings.warn(f"extract: specify --overwrite to overwrite existing file {out}")
         print("Nothing to do.")
         return
-
+    
+    if args.protein_fasta:
+        require_tools('hmmsearch')
+        with roseate.decorators.spinner('Existing proteins provided. Checking...', enabled=args.verbose):
+            report = roseate.extract.check_proteins(faa=args.protein_fasta,
+                                                    hmm_model=args.hmm,
+                                                    min_score=args.bitscore,
+                                                    out_dir=out.parent)
+        report_out = stage_file(args.out, 'extract', 'hmm_check')                                        
+        report.to_csv(report_out, sep='\t', index=False)
+        n_failed = (~report['passed']).sum()
+        if n_failed:
+            warnings.warn(f'{n_failed} of {len(report)} sequences below bitscore {args.bitscore} '
+                        f'against {args.hmm}; kept anyway, but please check {report_out}')
+        records = list(SeqIO.parse(args.protein_fasta, format='fasta'))
+        # seq id uniqueness check
+        if len(set(r.id for r in records)) < len(records):
+            raise UsageError(f'{args.protein_fasta}: sequence IDs (first space-delimited element of header) must be unique')
+        for r in records:
+            r.seq, r.description = r.seq.replace('*', ''), ''
+        # copy proteins
+        SeqIO.write(records, out, 'fasta')
+        vprint(f'Wrote {len(records)} proteins to {out}')
+        write_run_record(args, Path(args.out), [args.protein_fasta, args.hmm])
+        return
     # To do: reformat this to better handle errors and avoid intermediates
     # call proteins and run hmm on proteins
+    require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
     with roseate.decorators.spinner('Annotating', enabled=args.verbose):
         tables = roseate.extract.run_annotation(genome_list=args.genome_list, 
                                                 hmm_model=args.hmm,
@@ -158,7 +188,7 @@ def cmd_extract(args, vprint):
 @roseate.decorators.verbose_print
 def cmd_align(args, vprint):
 
-    from roseate import align, io
+    from roseate import align, io, decorators
     
     require_tools('mafft')
     protein_file = input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
@@ -441,6 +471,7 @@ def build_parser():
     input_args.add_argument('--bitscore', type=float, default=100, help='minimum bitscore')
     input_args.add_argument('--mode', type=str, choices=['meta', 'single'], default='meta',
                            help='prodigal mode for ORF calling: meta for metagenomes and contings, single for whole genomes')
+    input_args.add_argument('--protein-fasta', type=Path, help="Pre-defined protein sequences used to skip gene calling (with --genome-list)")
     sub_extract.set_defaults(func=cmd_extract)
 
 

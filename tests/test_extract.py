@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from Bio import SeqIO
+import numpy as np
 
 from roseate import extract
 from tests.archive import path
@@ -104,3 +105,10 @@ def test_archived_new_data_headers_match_v1_format():
     backbone_ids = {r.id for r in SeqIO.parse(path('inputs/high_qual_alignments/backbone.afa'), 'fasta')}
     added = [r.id for r in SeqIO.parse(aligned, 'fasta') if r.id not in backbone_ids]
     assert added and all(V1_HEADER.match(i) for i in added), added[:3]
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_check_proteins_scores_each_sequence(tmp_path):
+    report = extract.check_proteins(DATA / 'genomeA_proteins.faa', HMM, min_score=180, out_dir=tmp_path)
+    assert list(report['id']) == ['contig_1_1', 'contig_1_2', 'contig_2_1']
+    assert list(report['passed']) == [False, False, True]      # 175.4, no hit, 192.6
+    assert np.isnan(report['bitscore'][1])

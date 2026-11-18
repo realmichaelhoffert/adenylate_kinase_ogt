@@ -14,3 +14,7 @@ Completed refactoring of code into `roseate/` package to improve usability.
 * Fix script bug in run_esm_pipeline.sh
 * io.save_split function to save training / test splits
 * nn_models.train_model sizes neural network from inputs rather than hard-coded `768`
+
+## Changes on dev_workflow:
+* Add mode switch to script which runs prodigal. `extract --mode` selects mode.
+* add --protein-fasta option which skips annotation workflow: add protein check to --protein-fasta to avoid users putting in garbo sequences

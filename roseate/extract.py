@@ -45,6 +45,26 @@ def run_annotation(genome_list, hmm_model, mode='meta', jobs=4, script=ANNOTATIO
         tables.append(expected[1])
     return tables
 
+def check_proteins(faa, hmm_model, min_score=100, out_dir='.'):
+    '''
+    Checks a set of input proteins by running them against a provided HMM model
+    avoids incorrectly annotated proteins
+    faa: str or path? path to protein fasta
+    hmm_model: str or path to hmm model
+    min_score: minimum score for check (recommend something like PFAM trusted cutoff)
+    '''
+
+    table = Path(out_dir) / 'hmmsearch.tbl'
+    subprocess.run(['hmmsearch', '--tblout', str(table), str(hmm_model), str(faa)],
+                   stdout=subprocess.DEVNULL, check=True)
+    ids = [r.id for r in SeqIO.parse(faa, 'fasta')]
+    try:
+        scores = read_pfam_table_pandas(table).set_index('target_name')['full_score']
+    except ValueError:                       # no hits at all
+        scores = pd.Series(dtype=float)
+    report = pd.DataFrame({'id': ids, 'bitscore': scores.reindex(ids).values})
+    report['passed'] = report['bitscore'] >= min_score
+    return report
 
 def read_pfam_table_pandas(file_path):
     '''

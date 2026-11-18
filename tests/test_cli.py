@@ -238,3 +238,17 @@ def test_embed_with_saved_contexts_reproduces_embeddings(tmp_path):
     info = io.reload_pickle(stage(second, 'embed', 'context_info'))
     assert info['contexts_file'] == str(contexts) and 'context_seed' not in info
     assert str(contexts) in records(second)['inputs'].iloc[-1]
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_extract_protein_fasta_keeps_all_and_warns(tmp_path):
+    out = tmp_path / 'run'
+    with pytest.warns(UserWarning, match='1 of 3 sequences'):
+        run('extract', '-o', out, '--protein-fasta', FIXTURES / 'genomeA_proteins.faa')
+    assert [r.id for r in SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')] == \
+           ['contig_1_1', 'contig_1_2', 'contig_2_1']
+    assert pd.read_csv(stage(out, 'extract', 'hmm_check'), sep='\t')['passed'].sum() == 2
+
+@pytest.mark.parametrize('argv', [[], ['--genome-list', 'g.txt', '--protein-fasta', 'p.faa']])
+def test_extract_needs_exactly_one_input(argv, tmp_path):
+    with pytest.raises(SystemExit):
+        run('extract', '-o', tmp_path / 'run', *argv)
