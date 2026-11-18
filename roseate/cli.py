@@ -289,7 +289,7 @@ def cmd_fit(args, vprint):
     Usage:
     roseate fit
     '''
-
+    from threadpoolctl import threadpool_limits
     from roseate import fit, io
 
     # check outputs
@@ -332,10 +332,13 @@ def cmd_fit(args, vprint):
         # scaler for scaling traits, used if provided, otherwise fitted from training
         scaler = io.reload_pickle(args.scaler) if args.scaler else None
         train_ds, scaler = io.scale_traits(train_ds, scaler)
-        vprint('Loaded.')
 
-    vprint(f'Fitting {train_emb.shape[1]} sites on {len(train_ds)} sequences.')
-    enets, scalers = fit.train_per_site(train_emb, np.array([i[2] for i in train_ds]), verbose=args.verbose)
+    sites = [0] if args.test_mode else None
+    site_count = 1 if args.test_mode else train_emb.shape[1]
+    vprint(f'Fitting {site_count} sites on {len(train_ds)} sequences.')
+    with threadpool_limits(limits=1):      # one BLAS/OpenMP thread per ElasticNetCV job
+        enets, scalers = fit.train_per_site(train_emb, np.array([i[2] for i in train_ds]),
+                                            verbose=args.verbose, n_jobs=args.threads)
 
     # optional test set
     inputs = [train_emb_path, train_ds_path, args.traits, args.scaler]
@@ -386,6 +389,7 @@ def cmd_predict(args, vprint):
         scaler_path = input_file(args.scaler, args.out, 'fit', 'scaler', '--scaler')
         emb_path = input_file(args.emb, args.out, 'embed', 'embeddings', '--emb')
         msa_path = input_file(args.msa_dataset, args.out, 'align', 'msa_dataset', '--msa-dataset')
+        assert np.load(emb_path).shape[0] == len(io.reload_pickle(msa_path)), f'Are you sure these datasets of shape {np.load(emb_path).shape[0]} and {len(io.reload_pickle(msa_path))} match?'
 
     with roseate.decorators.spinner('Predicting', enabled=args.verbose):
         # construct predictions
@@ -471,6 +475,8 @@ def build_parser():
     train_args.add_argument("--train-dataset", type=Path, help="Pickled training MSA dataset")
     train_args.add_argument("--test-traits", type=Path,
                         help="Trait table for --test-dataset; default: --traits")
+    train_args.add_argument("--test-mode", action='store_true',
+                        help="Run on a single site for testing.")
     train_args.add_argument("--test-emb", type=Path, help="Optional: testing dataset embeddings")
     train_args.add_argument("--test-dataset", type=Path, help="Optional: Testing MSA Dataset")
     train_args.add_argument("--model-label", type=str, help="label stored in model metadata")

@@ -30,7 +30,7 @@ ENETCV_PARAMS = {'l1_ratio':[0.01, 0.1, 0.25, .5, .75, .9, 0.99, 1.0],
                 'random_state':123, 
                 'n_jobs':24}
 
-def train_per_site(train_emb : np.array, train_y : np.array, sites = None, verbose = False):
+def train_per_site(train_emb : np.array, train_y : np.array, sites = None, verbose = False, n_jobs=None):
 
     '''
     Fit per-site models
@@ -38,7 +38,7 @@ def train_per_site(train_emb : np.array, train_y : np.array, sites = None, verbo
     train_y: vector, values of trait
     sites: which sites to train
     '''
-
+    params = ENETCV_PARAMS if n_jobs is None else {**ENETCV_PARAMS, 'n_jobs': n_jobs}
     col_enets = {}
     col_scalers = {}
     if sites is not None:
@@ -59,7 +59,7 @@ def train_per_site(train_emb : np.array, train_y : np.array, sites = None, verbo
         col_scalers[col] = StandardScaler()
         X = col_scalers[col].fit_transform(col_embedding)
         # fit
-        enet = ElasticNetCV(**ENETCV_PARAMS)
+        enet = ElasticNetCV(**params)
         enet.fit(X, train_y)
         
         col_enets[col] = enet
