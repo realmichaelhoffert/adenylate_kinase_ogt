@@ -1,0 +1,7 @@
+include README.md
+graft configs
+prune data
+prune reference
+prune notebooks
+prune figures
+global-exclude *.pickle *.npy *.npz *.afa

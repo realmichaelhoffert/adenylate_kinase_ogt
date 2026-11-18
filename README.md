@@ -1,27 +1,53 @@
 # adenylate_kinase_ogt
 
-This is a repository for the code an analyses associated with the project "Predicting bacterial optimal growth temperatures using learned structural information from a single protein." This project develops a model, ROSEATE, which performs **R**egression **O**n **S**ite-specific **E**mbeddings for **A**denylate **K**inase-Based OG**T** **E**stimation to predict the optimal growth temperature (OGT) of bacteria. It's name is based on our use of the Rosetta, the macromolecular modeling suite, my love of birds, and because acronyms are fun.
+This is a repository for the code an analyses associated with the project "Predicting bacterial optimal growth temperatures using learned structural information from a single protein." This project develops a model, ROSEATE, which performs **R**egression **O**n **S**ite-specific **E**mbeddings for **A**denylate **K**inase-Based OG**T** **E**stimation to predict the optimal growth temperature (OGT) of bacteria. It's name is based on our use of the Rosetta (the macromolecular modeling suite), my love of birds, and because contrived backronyms.
 
 ## A. Installation
 
-### Option 1: Only run ROSEATE
+Environments are managed with [mamba](https://mamba.readthedocs.io). All commands
+below assume the environment is active, so `pip` is the environment's own pip
+(check with `which pip`, which should print a path under `$CONDA_PREFIX`).
 
-Install `adenylate_kinase_ogt.yaml` environment. This environment contains *all* packages required for the analyses from the manuscript, as well as those required to predict for new proteins using ROSEATE.
+### 1: Only run ROSEATE
+
+Install `envs/roseate.yaml` environment. This environment contains packages required to run the ROSEATE module functions.
 
 ```bash
-mamba env create -f adenylate_kinase_ogt.yaml
-mamba activate adenylate_kinase_ogt
+mamba env create -f envs/roseate.yml
+mamba activate roseate
+pip install --no-deps -e .
 ```
 
-### Option 2: Do protein folding.
+Check the installation with `roseate --help` and `pip check`. Tests are for ensuring code matches published figures during refactoring, and require an archive file.
 
-The environment to fold proteins was constructed using the instructions here:
-https://git.embl.de/grp-kosinski/alphafold_howto/-/tree/main
+### 2: Perform additional analyses
+
+Install `envs/analysis.yaml` environment.
+
+```bash
+mamba env create -f envs/roseate.yml
+mamba activate roseate
+pip install --no-deps -e .
+```
+
+Enables rerunning notebooks.
+
+### 3: Protein folding, running TOME, and other tasks
+
+Other specific tools have specific environments. Details below.  The environment to fold proteins was constructed using the instructions here:
+[https://git.embl.de/grp-kosinski/alphafold_howto/-/tree/main](https://git.embl.de/grp-kosinski/alphafold_howto/-/tree/main)
 Also install `ambertools` and `nglview` using the conda-forge channel. You can also install seaborn. If importing doesn't work, downgrading numpy to 1.23.5 fixed this problem for me.
+
+#### Notes
+
+`envs/*.lock.txt` lists the exact versions installed (created with
+`mamba list --explicit`). `adenylate_kinase_ogt.yaml` is the original single
+environment used for the preprint and is kept for reference.
 
 ## B. Run ROSEATE on new proteins
 
-### Annotate your proteins
+### Annotate your protein
+
 I have a helper script, `scripts/run_esm_pipeline.sh`, which can take a list of fastas (nucleotide assemblies or genomes) and extract ADKs from them using PFAM00406 (ADK).  
 
 ```bash

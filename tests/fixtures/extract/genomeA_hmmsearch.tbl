@@ -1,0 +1,15 @@
+#                                                               --- full sequence ---- --- best 1 domain ---- --- domain number estimation ----
+# target name        accession  query name           accession    E-value  score  bias   E-value  score  bias   exp reg clu  ov env dom rep inc description of target
+#------------------- ---------- -------------------- ---------- --------- ------ ----- --------- ------ -----   --- --- --- --- --- --- --- --- ---------------------
+contig_2_1           -          ADK                  PF00406.26   6.8e-61  192.6   0.0   8.1e-61  192.3   0.0   1.0   1   0   0   1   1   1   1 # 1 # 600 # 1 # ID=2_1
+contig_1_1           -          ADK                  PF00406.26   1.3e-55  175.4   0.0   1.5e-55  175.2   0.0   1.0   1   0   0   1   1   1   1 # 1 # 600 # 1 # ID=1_1
+#
+# Program:         hmmsearch
+# Version:         3.4 (Aug 2023)
+# Pipeline mode:   SEARCH
+# Query file:      PF00406.hmm
+# Target file:     genomeA_proteins.faa
+# Option settings: hmmsearch --tblout genomeA_hmmsearch.tbl PF00406.hmm genomeA_proteins.faa 
+# Current dir: .
+# Date:            Thu Nov  5 20:28:59 2026
+# [ok]
