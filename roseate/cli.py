@@ -565,17 +565,29 @@ def build_parser():
         s.add_argument('--threads', type=int, help='Number of threads', default=4)
     return p, subs
 
+def load_config_section(config : Path, command : str, subparser):
+    '''
+    load defaults for a command from a subsection of a config.yaml file
+    paths resolved against the config's folder, allowing any directory
+    '''
+    import yaml
+    with open(config) as f:
+        section = (yaml.safe_load(f) or {}).get(command) or {}
+    section = {k.replace('-', '_'): v for k,v in section.items()}
+    path_args = {a.dest for a in subparser._actions if a.type is Path}
+    for key, value in section.items():
+        if key in path_args and value is not None and not Path(value).is_absolute():
+            section[key] = (Path(config).resolve().parent / value).resolve()
+    return section
 
 def main(argv=None):
     parser, subs = build_parser()
     args = parser.parse_args(argv)
     # allow some args to be computed from config
     if args.config:
-        import yaml
-        with open(args.config) as f:
-            section = (yaml.safe_load(f) or {}).get(args.command, {})
-        subs[args.command].set_defaults(**{k.replace("-", "_"): v for k, v in section.items()})
-        args = parser.parse_args(argv)   # second pass: config values are defaults, flags override
+        subs[args.command].set_defaults(**load_config_section(args.config, args.command, subs[args.command]))
+        args = parser.parse_args(argv)   # second pass: config values are defaults, flags override  
+
     # catch missed args
     for name in REQUIRED.get(args.command, []):
         if getattr(args, name) is None:

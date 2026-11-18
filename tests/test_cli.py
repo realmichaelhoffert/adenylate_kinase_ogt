@@ -275,3 +275,15 @@ def test_align_train_ids_errors(extra, message, tmp_path, capsys):
     with pytest.raises(SystemExit):
         run('align', '-o', tmp_path / 'run', '--backbone', BACKBONE, *extra)
     assert message in capsys.readouterr().err
+
+def test_config_paths_are_relative_to_the_config_file(trained, copy_of, tmp_path, monkeypatch):
+    out = copy_of(trained)
+    configs = tmp_path / 'configs'
+    configs.mkdir()
+    shutil.copy(stage(out, 'fit', 'model'), tmp_path / 'model.pickle')
+    (configs / 'test.yaml').write_text('predict:\n  model: ../model.pickle\n')
+    elsewhere = tmp_path / 'elsewhere'
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)                      # relative to here, ../model.pickle does not exist
+    run('predict', '-o', out, '--config', configs / 'test.yaml', '--overwrite')
+    assert str(tmp_path / 'model.pickle') in records(out)['inputs'].iloc[-1]
