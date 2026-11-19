@@ -257,7 +257,7 @@ def cmd_embed(args, vprint):
     import numpy as np
     import warnings
     from pathlib import Path
-    from roseate import io, context, embed, decorators
+    from roseate import io, context, decorators
 
     embed_out = stage_file(args.out, 'embed', 'embeddings')
     if done([embed_out], args.overwrite):
@@ -265,6 +265,8 @@ def cmd_embed(args, vprint):
         print("Nothing to do.")
         return
     
+    from roseate import embed
+
     # load msa dataset
     msa = input_file(args.embed_dataset, args.out, 'align', 'msa_dataset', '--embed-dataset')
     with roseate.decorators.spinner('Loading MSA dataset', enabled=args.verbose):
