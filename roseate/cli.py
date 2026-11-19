@@ -540,7 +540,7 @@ def cmd_workflow(args):
         if not (args.command == 'fitting-workflow' and stage == 'fit'):
             argv += ['--config', config]
         argv += inputs.get(stage, [])
-        argv += [a for s, key, value in settings if s == stage for a in (f"=={key.replace('_', '-')}", value)]
+        argv += [a for s, key, value in settings if s == stage for a in (f"--{key.replace('_', '-')}", value)]
         argv += ['--verbose'] * args.verbose + ['--overwrite'] * args.overwrite
         main([str(a) for a in argv])
     if args.command == 'fitting-workflow':

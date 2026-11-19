@@ -126,7 +126,7 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
 
     written = []
     for count, file in enumerate(hmm_files):
-        print(f'{count+1} tables processed of {len(hmm_files)}', end='\r')
+        # print(f'{count+1} tables processed of {len(hmm_files)}', end='\r')
         try:
             df = read_pfam_table_pandas(file)
         except ValueError:
