@@ -561,7 +561,7 @@ def write_model_config(config, args, settings):
         stages = [s for s in (yaml.safe_load(f) or {}) if s in RUN_FILES]
     model_config = {s: load_config_section(config, s, subs[s]) for s in stages}
     for stage, key, value in settings:
-        if stage == 'embed':                       # prediction must embed the same way as training
+        if stage == 'embed' and key not in ('contexts', 'exclude_self'):                       # prediction must embed the same way as training
             model_config.setdefault('embed', {})[key] = yaml.safe_load(value)
     model_config.setdefault('align', {})['backbone'] = out / RUN_FILES['align']['alignment']
     model_config.setdefault('embed', {})['context_dataset'] = out / RUN_FILES['align']['msa_dataset']
