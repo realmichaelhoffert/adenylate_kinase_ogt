@@ -15,6 +15,7 @@ echo "Repo root: $REPO_ROOT"
 MODE="meta"
 GENOME_LIST=""
 HMM_MODEL=""
+OUTDIR="."
 
 JOBS=4  # Default parallel jobs
 
@@ -34,6 +35,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --genome-list)
             GENOME_LIST="$2"
+            shift 2
+            ;;
+        --outdir)
+            OUTDIR="$2"
             shift 2
             ;;
         --mode)
@@ -82,17 +87,18 @@ fi
 run_prodigal() {
     genome="$1"
 
-    # Strip directory and extensions: .fasta, .fa, .fasta.gz, .fa.gz
-    # filename=$(basename "$genome")
-    base="${genome%.fasta}"
+    # Outputs go to OUTDIR, named after the file without .gz and .fasta/.fna/.fa
+    filename=$(basename "$genome")
+    base="${filename%.gz}"
+    base="${base%.fasta}"
+    base="${base%.fna}"
     base="${base%.fa}"
-    base="${base%.fasta.gz}"
-    base="${base%.fa.gz}"
+    base="$OUTDIR/$base"
 
     # Support gzipped files transparently
     if [[ "$genome" == *.gz ]]; then
-        zcat "$genome" > "/tmp/${base}_temp.fa"
-        genome="/tmp/${base}_temp.fa"
+        zcat "$genome" > "${base}_temp.fa"
+        genome="${base}_temp.fa"
     fi
 
     seqtk seq -A -L 300 "$genome" > "${base}_filtered.fasta"
@@ -109,11 +115,13 @@ run_prodigal() {
     fi
 
     # Cleanup
-    if [[ -f "/tmp/${base}_temp.fa" ]]; then rm "/tmp/${base}_temp.fa"; fi
+    if [[ -f "${base}_temp.fa" ]]; then rm "${base}_temp.fa"; fi
 }
 
 export -f run_prodigal
 export HMM_MODEL
+export OUTDIR
+mkdir -p "OUTDIR"
 export MODE
 
 # Run in parallel

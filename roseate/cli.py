@@ -122,8 +122,8 @@ def cmd_extract(args, vprint):
     import roseate.extract
     
     # require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
-    if bool(args.genome_list) == bool(args.protein_fasta):
-        raise UsageError('Only give one of --genome-list  or --protein-fasta')
+    if bool(args.genomes) == bool(args.protein_fasta):
+        raise UsageError('Only give one of --genomes  or --protein-fasta')
     out = stage_file(args.out, 'extract', 'proteins')
 
     if done([out], args.overwrite):
@@ -158,15 +158,24 @@ def cmd_extract(args, vprint):
     # To do: reformat this to better handle errors and avoid intermediates
     # call proteins and run hmm on proteins
     require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+    try:
+        genomes = roseate.extract.find_genomes(args.genomes)
+    except (FileNotFoundError, ValueError) as e:
+        raise UsageError(str(e))
+    # write genome files within run output
+    genome_dir = out.parent / 'genomes'
+    vprint(f'Annotating {len(genomes)} genomes')
+
     with roseate.decorators.spinner('Annotating', enabled=args.verbose):
-        tables = roseate.extract.run_annotation(genome_list=args.genome_list, 
+        tables = roseate.extract.run_annotation(genomes=args.genomes, 
                                                 hmm_model=args.hmm,
+                                                out_dir=genome_dir,
                                                 mode=args.mode,
                                                 jobs=args.threads)
 
     # process hmm table to make per-genome protein file
     with roseate.decorators.spinner('Processing tables',   enabled=args.verbose):
-        written = roseate.extract.process_hmms(loc=Path(tables[0]).parent, 
+        written = roseate.extract.process_hmms(loc=genome_dir, 
                                                protein_name=args.protein_name,
                                                n_proteins=args.n_proteins,
                                                min_score=args.bitscore,
@@ -175,7 +184,7 @@ def cmd_extract(args, vprint):
     vprint(f'Processed {len(written)} tables.')
     # currently assumes all files are in the same directory,
     # adk name is hard-coded
-    file = roseate.extract.concat_adks(loc=Path(tables[0]).parent, 
+    file = roseate.extract.concat_adks(loc=genome_dir, 
                                        out=out, 
                                        protein_name=args.protein_name)
     with open(file, "rb") as f:
@@ -183,7 +192,7 @@ def cmd_extract(args, vprint):
     vprint(f'Wrote {count} proteins to {out}')
 
     # record args
-    write_run_record(args, Path(args.out), [args.genome_list, args.hmm])
+    write_run_record(args, Path(args.out), [genome_dir / 'genome_list.txt', args.hmm])
 
 
 
@@ -504,9 +513,9 @@ def workflow_inputs(args):
     '''
     if args.command == 'prediction-workflow':
         if args.genomes:
-            return {'extract': ['--genome-list', args.genomes, '--mode', 'single']}
+            return {'extract': ['--genomes', *args.genomes, '--mode', 'single']}
         if args.metagenomes:
-            return {'extract':['--genome-list', args.metagenomes, '--mode', 'meta', '--n-proteins', 1000]}
+            return {'extract':['--genomes', *args.metagenomes, '--mode', 'meta', '--n-proteins', 1000]}
         return {'extract':['--protein-fasta', args.proteins]}
     dataset = Path(args.out) / RUN_FILES['align']['msa_dataset']
     return {'align': ['--backbone', args.alignment, '--train-ids', args.train_ids],
@@ -569,14 +578,14 @@ def build_parser():
     # extract
     sub_extract = subs['extract'] = sub.add_parser('extract', help='Extract proteins')
     input_args = sub_extract.add_argument_group("Input arguments")
-    input_args.add_argument('--genome-list', type=Path, help="Newline delimited file or location of genomes or samples for prediction")
+    input_args.add_argument('--genomes', type=Path, nargs='+', help="Folder of genomes or samples for prediction")
     input_args.add_argument('--hmm', type=Path, help='HMM for annotating proteins',
                             default=Path(__file__).parents[1] / 'data' / 'PF00406.hmm')
     input_args.add_argument('--n-proteins', type=int, default=1, help='max proteins per genome')
     input_args.add_argument('--bitscore', type=float, default=100, help='minimum bitscore')
     input_args.add_argument('--mode', type=str, choices=['meta', 'single'], default='meta',
                            help='prodigal mode for ORF calling: meta for metagenomes and contings, single for whole genomes')
-    input_args.add_argument('--protein-fasta', type=Path, help="Pre-defined protein sequences used to skip gene calling (with --genome-list)")
+    input_args.add_argument('--protein-fasta', type=Path, help="Pre-defined protein sequences used to skip gene calling (skip --genomes)")
     sub_extract.set_defaults(func=cmd_extract)
 
 
@@ -643,8 +652,8 @@ def build_parser():
     sub_pw.add_argument('protein', nargs='?', default='adk',
                         help='Model to use: configs/<protein>.yaml (default: adk); ignored with --config')
     pw_inputs = sub_pw.add_argument_group('Input (exactly one)').add_mutually_exclusive_group(required=True)
-    pw_inputs.add_argument('--genomes', type=Path, help='File listing genome FASTA paths (prodigal single-genome mode)')
-    pw_inputs.add_argument('--metagenomes', type=Path, help='File listing metagenome assembly paths (prodigal metagenome mode)')
+    pw_inputs.add_argument('--genomes', type=Path, nargs='+', help='File listing genome FASTA paths (prodigal single-genome mode)')
+    pw_inputs.add_argument('--metagenomes', type=Path, nargs='+', help='File listing metagenome assembly paths (prodigal metagenome mode)')
     pw_inputs.add_argument('--proteins', type=Path, help='Protein FASTA; sequences are checked against the HMM')
 
     sub_fw = subs['fitting-workflow'] = sub.add_parser(

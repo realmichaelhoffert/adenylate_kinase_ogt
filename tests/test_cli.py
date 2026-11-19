@@ -193,12 +193,11 @@ def test_extract_then_align(tmp_path):
     genome = tmp_path / 'genomes' / 'genomeB.fasta'
     genome.parent.mkdir()
     shutil.copy(FIXTURES / 'genomeB.fasta', genome)
-    (tmp_path / 'genomes.txt').write_text(f'{genome}\n')
     backbone = tmp_path / 'backbone.afa'
     SeqIO.write(list(SeqIO.parse(BACKBONE, 'fasta'))[:50], backbone, 'fasta')   # small, so mafft is fast
     out = tmp_path / 'run'
 
-    run('extract', '-o', out, '--genome-list', tmp_path / 'genomes.txt', '--threads', 1)
+    run('extract', '-o', out, '--genomes', genome, '--threads', 1)
     run('align', '-o', out, '--backbone', backbone)
 
     [protein] = SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')
@@ -248,7 +247,7 @@ def test_extract_protein_fasta_keeps_all_and_warns(tmp_path):
            ['contig_1_1', 'contig_1_2', 'contig_2_1']
     assert pd.read_csv(stage(out, 'extract', 'hmm_check'), sep='\t')['passed'].sum() == 2
 
-@pytest.mark.parametrize('argv', [[], ['--genome-list', 'g.txt', '--protein-fasta', 'p.faa']])
+@pytest.mark.parametrize('argv', [[], ['--genomes', 'g.fa', '--protein-fasta', 'p.faa']])
 def test_extract_needs_exactly_one_input(argv, tmp_path):
     with pytest.raises(SystemExit):
         run('extract', '-o', tmp_path / 'run', *argv)
