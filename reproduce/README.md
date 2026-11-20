@@ -7,7 +7,7 @@ Baseline: `python reproduce/preprint.py --reference reference/v1_preprint/ --mod
 
 ## Refit model `models/refit`
 ```
-roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids dreproduce/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler reference/v1_preprint/inputs/predictive_models/supporting_data/ogt_scaler.pickle -o models/refit --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy
+roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids reproduce/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler models/v1_preprint/scaler.pickle -o models/refit --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy
 ```
 ## Check refit matches archived
 ```
@@ -25,12 +25,12 @@ print('\n'.join(d[:20]) or 'models match')"
 
 ## Layer 1 model
 ```
-roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids reproduce/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler reference/v1_preprint/inputs/predictive_models/supporting_data/ogt_scaler.pickle -o models/layer1 --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy --set embed.layer=1
+roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids reproduce/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler models/v1_preprint/scaler.pickle -o models/layer1 --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy --set embed.layer=1
 ```
 
 ## Layer 6 model:
 ```
-roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids reproduce/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler reference/v1_preprint/inputs/predictive_models/supporting_data/ogt_scaler.pickle -o models/layer6 --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy --set embed.layer=6
+roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids reproduce/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler models/v1_preprint/scaler.pickle -o models/layer6 --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy --set embed.layer=6
 ```
 ## Arthrobacter
 `roseate prediction-workflow --genomes ./data/validation_datasets/Arthrobacter/genomes/*.fasta -o examples/Arthrobacter --threads 8 --verbose`
