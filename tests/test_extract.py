@@ -112,7 +112,7 @@ def test_check_proteins_scores_each_sequence(tmp_path):
     assert np.isnan(report['bitscore'][1])
 
 def test_genome_name_strips_fasta_and_gz_extensions():
-    for name in ['x.fa', 'x.fna', 'x.fasta', 'x.fa.gz', 'x.fna.gz', 'x.fasta.gz', 'dir/x.fna']:
+    for name in ['x.fa', 'x.fna', 'x.fasta', 'x.fa.gz', 'x.fna.gz', 'x.fasta.gz', 'dir/x.fna', 'x.faa', 'x.faa.gz']:
         assert extract.genome_name(name) == 'x'
 
 def test_find_genomes_from_files_and_folders(tmp_path):
@@ -130,3 +130,13 @@ def test_find_genomes_errors(names, error, tmp_path):
         (tmp_path / name).write_text('>x\nACGT\n')
     with pytest.raises(error):
         extract.find_genomes([tmp_path / n for n in names])
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_search_proteins_feeds_process_hmms(tmp_path):
+    shutil.copy(DATA / 'genomeA_proteins.faa', tmp_path / 'sampleA.faa')
+    out_dir = tmp_path / 'out'
+    tables = extract.search_proteins(extract.find_genomes([tmp_path / 'sampleA.faa']), HMM, out_dir, jobs=1)
+    assert tables == [out_dir / 'sampleA_hmmsearch.tbl']
+    extract.process_hmms(out_dir, n_proteins=1)
+    [best] = read(out_dir / 'sampleA_adk.faa')
+    assert best.id == 'contig_2_1|sampleA|adk|bitscore=192.6'

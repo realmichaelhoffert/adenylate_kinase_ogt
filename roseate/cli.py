@@ -164,7 +164,8 @@ def cmd_extract(args, vprint):
         raise UsageError(str(e))
     # write genome files within run output
     genome_dir = out.parent / 'genomes'
-    vprint(f'Annotating {len(genomes)} genomes')
+    msg = ' metagenomes' if args.mode == 'meta' else ' genomes'
+    vprint(f'Annotating {len(genomes)}' + msg)
 
     with roseate.decorators.spinner('Annotating', enabled=args.verbose):
         tables = roseate.extract.run_annotation(genomes=args.genomes, 

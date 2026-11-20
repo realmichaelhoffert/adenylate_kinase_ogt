@@ -1,5 +1,8 @@
 .DS_Store
 *models*
+/tests/layer1*
+/tests/layer6*
+/tests/Shah2024*
 *examples*
 *egg-info*
 /reference*

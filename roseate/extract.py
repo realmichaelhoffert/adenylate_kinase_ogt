@@ -22,13 +22,13 @@ pfam_table_columns = ['target_name', 'target_accession', 'query_name', 'query_ac
                       'best_domain_e_value', 'best_domain_score', 'best_domain_bias',
                       'exp', 'reg', 'clu', 'ov', 'env', 'dom', 'rep', 'inc', 'description_of_target']
 
-FASTA_SUFFIXES = ('.fa', '.fna', '.fasta', '.fa.gz', '.fna.gz', '.fasta.gz')
+FASTA_SUFFIXES = ('.fa', '.fna', '.fasta', '.fa.gz', '.fna.gz', '.fasta.gz', '.faa', '.faa.gz')
 
 
 def genome_name(path):
     '''Sample name of a genome file: its name without .gz and .fasta/.fna/.fa, as in the annotation script.'''
     name = Path(path).name.removesuffix('.gz')
-    for ext in ('.fasta', '.fna', '.fa'):
+    for ext in ('.fasta', '.fna', '.fa', '.faa'):
         name = name.removesuffix(ext)
     return name
 
@@ -54,6 +54,31 @@ def find_genomes(inputs):
     if repeated:
         raise ValueError(f'genome file names must be unique after removing extensions; repeated: {repeated[:5]}')
     return [g.resolve() for g in genomes]
+
+def search_proteins(fastas, hmm_model, out_dir, jobs=4):
+    '''
+    hmmsearch on protein FASTA files (genes already called), one file per genome or sample.
+    Each file is linked (or uncompressed) to out_dir as {genome_name}_proteins.faa (decompressed if .gz) and searched,
+    giving the same files as run_annotation, so process_hmms and concat_adks work unchanged.
+    Returns: a list of the hmmsearch tables.
+    '''
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tables = []
+    for fasta in fastas:
+        base = out_dir / genome_name(fasta)
+        proteins, table = Path(f'{base}_proteins.faa'), Path(f'{base}_hmmsearch.tbl')
+        if proteins.exists() or proteins.is_symlink():      # from an earlier run, e.g. with --overwrite
+            proteins.unlink()
+        if str(fasta).endswith('.gz'):                      # gzipped: decompress into the run folder
+            with gzip.open(fasta, 'rt') as source, open(proteins, 'w') as copy:
+                shutil.copyfileobj(source, copy)
+        else:                                               # plain: link to the original, no copy
+            proteins.symlink_to(Path(fasta).resolve())
+        subprocess.run(['hmmsearch', '--cpu', str(jobs), '--tblout', str(table), str(hmm_model), str(proteins)],
+                       stdout=subprocess.DEVNULL, check=True)
+        tables.append(table)
+    return tables
 
 # Todo: add metagenome / isolate flag
 def run_annotation(genomes, hmm_model, out_dir, mode='meta', jobs=4, script=ANNOTATION_SCRIPT):
