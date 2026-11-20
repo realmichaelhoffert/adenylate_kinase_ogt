@@ -50,6 +50,8 @@ Also install `ambertools` and `nglview` using the conda-forge channel. You can a
 `mamba list --explicit`). `adenylate_kinase_ogt.yaml` is the original single
 environment used for the preprint and is kept for reference.
 
+  
+
 ## Usage
 
 ### Run ROSEATE on new proteins using the ADK model
@@ -72,7 +74,7 @@ roseate prediction-workflow --genome-proteins [dir/*.faa] --verbose --threads [n
 
 On pre-annotated proteins (ORF amino acid fastas) from metagenomes:
 ```bash
-roseate prediction-workflow --genome-proteins [dir/*.faa] --verbose --threads [n_threads] -o out_dir
+roseate prediction-workflow --metagenome-proteins [dir/*.faa] --verbose --threads [n_threads] -o out_dir
 ```
 
 On a pre-identified set of ADK proteins:
