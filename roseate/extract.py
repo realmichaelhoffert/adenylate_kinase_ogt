@@ -81,7 +81,6 @@ def search_proteins(fastas, hmm_model, out_dir, jobs=4):
         tables.append(table)
     return tables
 
-# Todo: add metagenome / isolate flag
 def run_annotation(genomes, hmm_model, out_dir, mode='meta', jobs=4, script=ANNOTATION_SCRIPT):
     '''
     Gene calling (prodigal -p {mode}) and hmmsearch for every genome in genome_list,

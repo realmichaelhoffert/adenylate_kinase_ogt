@@ -28,5 +28,6 @@ dependencies:
   - seqtk=1.5
   - parallel
   - mmseqs2=17.b804f
+  - threadpoolctl
   - pip:
       - fair-esm==2.0.0          # not on conda-forge

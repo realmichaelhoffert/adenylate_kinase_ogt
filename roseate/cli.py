@@ -340,7 +340,7 @@ def cmd_embed(args, vprint):
     layer = model.num_layers if args.layer == -1 else args.layer
         
     # generate embeddings
-    print('Embedding:')
+    vprint('Embedding:')
     emb, _, _ = embed.get_embeddings(model=model, 
                               batch_converter=conv, 
                               data_to_embed = embed_dataset,
