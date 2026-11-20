@@ -56,9 +56,11 @@ def test_prediction_workflow_runs_all_stages_with_the_protein_config(monkeypatch
     assert options(calls[0])['--mode'] == ['single']
 
 @pytest.mark.parametrize('inputs, extract_options', [
-    (['--genomes', 'g.fna'], {'--mode': ['single']}),
-    (['--metagenomes', 'm.fa'], {'--mode': ['meta'], '--n-proteins': ['1000']}),
-    (['--proteins', 'p.faa'], {'--protein-fasta': ['p.faa']}),
+    (['--genomes', 'g.fna'], {'--genomes': ['g.fna'], '--mode': ['single'], '--n-proteins': ['1']}),
+    (['--metagenomes', 'm.fa'], {'--genomes': ['m.fa'], '--mode': ['meta'], '--n-proteins': ['1000']}),
+    (['--genome-proteins', 'g.faa'], {'--protein-files': ['g.faa'], '--n-proteins': ['1']}),
+    (['--metagenome-proteins', 'm.faa'], {'--protein-files': ['m.faa'], '--n-proteins': ['1000']}),
+    (['--sequences', 'p.faa'], {'--sequences': ['p.faa']}),
 ])
 def test_prediction_inputs_become_extract_options(monkeypatch, inputs, extract_options):
     extract = options(stage_commands(monkeypatch, 'prediction-workflow', *inputs, '-o', 'run')[0])
@@ -74,7 +76,7 @@ def test_set_options_go_to_their_stage_and_win(monkeypatch):
     assert '--sites' not in options(calls[1])
 
 def test_shared_options_reach_every_stage(monkeypatch):
-    calls = stage_commands(monkeypatch, 'prediction-workflow', '--proteins', 'p.faa', '-o', 'run',
+    calls = stage_commands(monkeypatch, 'prediction-workflow', '--sequences', 'p.faa', '-o', 'run',
                            '--threads', 8, '--verbose', '--overwrite')
     for call in calls:
         o = options(call)
@@ -108,9 +110,9 @@ def test_model_config_points_to_the_fitted_run(tmp_path):
     assert Path(config['extract']['hmm']).is_absolute() and Path(config['extract']['hmm']).exists()
 
 @pytest.mark.parametrize('argv, message', [
-    (['prediction-workflow', '--proteins', 'p.faa', '--set', 'predict.sites'], 'STAGE.OPTION=VALUE'),
-    (['prediction-workflow', '--proteins', 'p.faa', '--set', 'nope.x=1'], 'STAGE.OPTION=VALUE'),
-    (['prediction-workflow', 'not_a_protein', '--proteins', 'p.faa'], 'config'),
+    (['prediction-workflow', '--sequences', 'p.faa', '--set', 'predict.sites'], 'STAGE.OPTION=VALUE'),
+    (['prediction-workflow', '--sequences', 'p.faa', '--set', 'nope.x=1'], 'STAGE.OPTION=VALUE'),
+    (['prediction-workflow', 'not_a_protein', '--sequences', 'p.faa'], 'config'),
     (['prediction-workflow'], 'one of the arguments'),
     (['fitting-workflow', '--alignment', 'B.afa'], '--train-ids is required'),
 ])
@@ -153,7 +155,7 @@ def test_prediction_workflow_resumes_from_existing_stages(tmp_path):
     np.save(cli.stage_file(out, 'embed', 'embeddings'), emb[:5])
 
     with pytest.warns(UserWarning, match='--overwrite'):
-        run('prediction-workflow', '--proteins', FIXTURES / 'genomeA_proteins.faa', '-o', out, '--config', config)
+        run('prediction-workflow', '--sequences', FIXTURES / 'genomeA_proteins.faa', '-o', out, '--config', config)
     predictions = pd.read_csv(cli.stage_file(out, 'predict', 'predictions'), sep='\t', index_col=0)
     assert list(predictions.index) == [d[0] for d in ds[:5]]
     assert list(pd.read_json(out / 'run.jsonl', lines=True)['stage']) == ['fit', 'predict']
@@ -179,7 +181,7 @@ def test_fit_then_predict_end_to_end(tmp_path):
 
     out = tmp_path / 'predicted'
     with pytest.warns(UserWarning, match='1 of 3'):                               # the fixture's decoy protein
-        run('prediction-workflow', '--config', model_config, '--proteins', FIXTURES / 'genomeA_proteins.faa',
+        run('prediction-workflow', '--config', model_config, '--sequences', FIXTURES / 'genomeA_proteins.faa',
             '-o', out, '--threads', 2)
     predictions = pd.read_csv(cli.stage_file(out, 'predict', 'predictions'), sep='\t', index_col=0)
     assert list(predictions.index) == ['contig_1_1', 'contig_1_2', 'contig_2_1']

@@ -16,6 +16,7 @@ dependencies = [
    "joblib",
    "tqdm",
    "pyyaml",
+   'threadpoolctl'
 ]
 [project.scripts]
 roseate = "roseate.cli:main"

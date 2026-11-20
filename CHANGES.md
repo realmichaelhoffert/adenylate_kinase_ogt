@@ -17,4 +17,12 @@ Completed refactoring of code into `roseate/` package to improve usability.
 
 ## Changes on dev_workflow:
 * Add mode switch to script which runs prodigal. `extract --mode` selects mode.
-* add --protein-fasta option which skips annotation workflow: add protein check to --protein-fasta to avoid users putting in garbo sequences
+* add --genome-proteins and --metagenome-proteins which recycle workflow from --genomes and --metagenomes, just skipping annotation step
+* add --sequences option which skips annotation workflow: add protein check to --sequences to avoid users putting in garbo sequences
+* in `cmd_extract`, write a `1_extract/genomes` folder with symlinks to input genomes or metagenomes for annotation
+* add `align --train-ids`, which allows only specific sequences to be extracted from the alignment for training (e.g. the even dataset)
+* added `prediction-workflow`
+    * reuses input parsers for each sub-command and a pre-written config referencing the preprint model (will be changed to "current" model)
+* added `fitting-workflow`
+    * same design as prediction workflow, but starts with align.
+    * a fitting workflow writes `model_config.yaml` within the output folder, so that a NEW prediction workflow can pass --config `fitted_model/model_config.yaml` using the newly fitted model.

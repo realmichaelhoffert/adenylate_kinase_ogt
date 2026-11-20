@@ -62,13 +62,26 @@ roseate prediction-workflow --genomes [dir/*.fa] --verbose --threads [n_threads]
 
 On metagenomic assemblies:
 ```bash
-roseate prediction-workflow --genomes [dir/*.fa] --verbose --threads [n_threads] -o out_dir
+roseate prediction-workflow --metagenomes [dir/*.fa] --verbose --threads [n_threads] -o out_dir
 ```
 
-On pre-annotated proteins:
+On pre-annotated proteins (ORF amino acid fastas) from genomes:
 ```bash
-roseate prediction-workflow --proteins proteins.fasta --verbose --threads [n_threads] -o out_dir
+roseate prediction-workflow --genome-proteins [dir/*.faa] --verbose --threads [n_threads] -o out_dir
 ```
+
+On pre-annotated proteins (ORF amino acid fastas) from metagenomes:
+```bash
+roseate prediction-workflow --genome-proteins [dir/*.faa] --verbose --threads [n_threads] -o out_dir
+```
+
+On a pre-identified set of ADK proteins:
+```bash
+roseate prediction-workflow --sequences [dir/*.faa] --verbose --threads [n_threads] -o out_dir
+```
+
+### Notes
+Files can be provided as list (`genome1.fasta` `genome1.fasta`), folder (`genomes/`), or folder with wildcard extension (`genome/*.fasta`). When providing a folder, all files with common extensions (.fa, .fasta, .fna, .faa) will be used. `--genomes` and `--metagenomes` must be nucleotide fastas.
 
 ### Outputs
 Saved under `out_dir`:
@@ -109,7 +122,7 @@ Each stage is a command, roseate <stage> -o OUT. It reads the previous stage's f
 ┌─────▼───────────────────────────────────────────────────┐           |
 │ 1_extract  extract.py                                   │           |
 │ prodigal (single / meta) → hmmsearch → best hits,       │           |
-│ or given proteins scored against the HMM                │           |
+│ or given sequences scored against the HMM               │           |
 │ → proteins.faa                                          │           |
 └─────┬───────────────────────────────────────────────────┘           |
       │                                                               │

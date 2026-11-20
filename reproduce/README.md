@@ -35,7 +35,7 @@ roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered
 ## Arthrobacter
 `roseate prediction-workflow --genomes ./data/validation_datasets/Arthrobacter/genomes/*.fasta -o examples/Arthrobacter --threads 8 --verbose`
 ## Mycobacteria
-`roseate prediction-workflow --genomes ./data/validation_datasets/Arthrobacter/genomes/*.fasta -o examples/Arthrobacter --threads 8 --verbose`
+`roseate prediction-workflow --genomes ./data/validation_datasets/Mycobacteria/genomes/*.fasta -o examples/Mycobacteria --threads 8 --verbose`
 
 Differences in predictions are reasonable and will be clarified in further testing of embedding properties
 

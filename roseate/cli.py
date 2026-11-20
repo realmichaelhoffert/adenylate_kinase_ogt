@@ -526,11 +526,16 @@ def workflow_inputs(args):
     args for the workflows
     '''
     if args.command == 'prediction-workflow':
+        # input kind -> extract arguments: nucleotide or protein files, and how many hits to keep per file
         if args.genomes:
-            return {'extract': ['--genomes', *args.genomes, '--mode', 'single']}
+            return {'extract': ['--genomes', *args.genomes, '--mode', 'single', '--n-proteins', 1]}
         if args.metagenomes:
-            return {'extract':['--genomes', *args.metagenomes, '--mode', 'meta', '--n-proteins', 1000]}
-        return {'extract':['--protein-fasta', args.proteins]}
+            return {'extract': ['--genomes', *args.metagenomes, '--mode', 'meta', '--n-proteins', 1000]}
+        if args.genome_proteins:
+            return {'extract': ['--protein-files', *args.genome_proteins, '--n-proteins', 1]}
+        if args.metagenome_proteins:
+            return {'extract': ['--protein-files', *args.metagenome_proteins, '--n-proteins', 1000]}
+        return {'extract': ['--sequences', args.sequences]}
     dataset = Path(args.out) / RUN_FILES['align']['msa_dataset']
     return {'align': ['--backbone', args.alignment, '--train-ids', args.train_ids],
             'embed': ['--context-dataset', dataset, '--exclude-self'],
@@ -671,9 +676,16 @@ def build_parser():
     sub_pw.add_argument('protein', nargs='?', default='adk',
                         help='Model to use: configs/<protein>.yaml (default: adk); ignored with --config')
     pw_inputs = sub_pw.add_argument_group('Input (exactly one)').add_mutually_exclusive_group(required=True)
-    pw_inputs.add_argument('--genomes', type=Path, nargs='+', help='File listing genome FASTA paths (prodigal single-genome mode)')
-    pw_inputs.add_argument('--metagenomes', type=Path, nargs='+', help='File listing metagenome assembly paths (prodigal metagenome mode)')
-    pw_inputs.add_argument('--proteins', type=Path, help='Protein FASTA; sequences are checked against the HMM')
+    pw_inputs.add_argument('--genomes', type=Path, nargs='+',
+                           help='Genome FASTA files and/or folders: prodigal single-genome mode, 1 hit per genome')
+    pw_inputs.add_argument('--metagenomes', type=Path, nargs='+',
+                           help='Metagenome assembly FASTA files and/or folders: prodigal metagenome mode, up to 1000 hits per sample')
+    pw_inputs.add_argument('--genome-proteins', type=Path, nargs='+',
+                           help='Protein FASTA files and/or folders, one per genome (genes already called): 1 hit per genome')
+    pw_inputs.add_argument('--metagenome-proteins', type=Path, nargs='+',
+                           help='Protein FASTA files and/or folders, one per sample (genes already called): up to 1000 hits per sample')
+    pw_inputs.add_argument('--sequences', type=Path,
+                           help='One FASTA of proteins already identified: all kept, checked against the HMM')
 
     sub_fw = subs['fitting-workflow'] = sub.add_parser(
         'fitting-workflow', help='Fit a model on rows of an alignment: align, embed, fit; writes model_config.yaml')
