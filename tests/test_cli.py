@@ -239,15 +239,16 @@ def test_embed_with_saved_contexts_reproduces_embeddings(tmp_path):
     assert str(contexts) in records(second)['inputs'].iloc[-1]
 
 @pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
-def test_extract_protein_fasta_keeps_all_and_warns(tmp_path):
+def test_extract_sequences_keeps_all_and_warns(tmp_path):
     out = tmp_path / 'run'
     with pytest.warns(UserWarning, match='1 of 3 sequences'):
-        run('extract', '-o', out, '--protein-fasta', FIXTURES / 'genomeA_proteins.faa')
+        run('extract', '-o', out, '--sequences', FIXTURES / 'genomeA_proteins.faa')
     assert [r.id for r in SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')] == \
            ['contig_1_1', 'contig_1_2', 'contig_2_1']
     assert pd.read_csv(stage(out, 'extract', 'hmm_check'), sep='\t')['passed'].sum() == 2
 
-@pytest.mark.parametrize('argv', [[], ['--genomes', 'g.fa', '--protein-fasta', 'p.faa']])
+@pytest.mark.parametrize('argv', [[], ['--genomes', 'g.fa', '--sequences', 'p.faa'],
+                                  ['--protein-files', 'p.faa', '--sequences', 'p.faa']])
 def test_extract_needs_exactly_one_input(argv, tmp_path):
     with pytest.raises(SystemExit):
         run('extract', '-o', tmp_path / 'run', *argv)
@@ -286,3 +287,12 @@ def test_config_paths_are_relative_to_the_config_file(trained, copy_of, tmp_path
     monkeypatch.chdir(elsewhere)                      # relative to here, ../model.pickle does not exist
     run('predict', '-o', out, '--config', configs / 'test.yaml', '--overwrite')
     assert str(tmp_path / 'model.pickle') in records(out)['inputs'].iloc[-1]
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_extract_protein_files_keeps_best_hit_per_file(tmp_path):
+    (tmp_path / 'proteins').mkdir()
+    shutil.copy(FIXTURES / 'genomeA_proteins.faa', tmp_path / 'proteins' / 'sampleA.faa')
+    out = tmp_path / 'run'
+    run('extract', '-o', out, '--protein-files', tmp_path / 'proteins')      # a folder of protein files
+    assert [r.id for r in SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')] == \
+           ['contig_2_1|sampleA|adk|bitscore=192.6']

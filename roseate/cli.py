@@ -118,12 +118,20 @@ def write_run_record(args, out_dir, inputs):
 @roseate.decorators.verbose_print
 def cmd_extract(args, vprint):
 
+    '''
+    Find the protein of interest. Three kinds of input:
+    roseate extract --genomes FILES [--mode single|meta]   nucleotide FASTAs: call genes, search, keep best hits
+    roseate extract --protein-files FILES                  protein FASTAs: search, keep best hits
+    roseate extract --sequences FASTA                      proteins already identified: check against the HMM, keep all
+    '''
     from Bio import SeqIO
     import roseate.extract
-    
-    # require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
-    if bool(args.genomes) == bool(args.protein_fasta):
-        raise UsageError('Only give one of --genomes  or --protein-fasta')
+
+    # ensure only 1 input option is recieved    
+    if sum(x is not None for x in (args.genomes, args.protein_files, args.sequences)) != 1:
+        raise UsageError('give exactly one of --genomes, --protein-files and --sequences')
+
+    # main output: protein file
     out = stage_file(args.out, 'extract', 'proteins')
 
     if done([out], args.overwrite):
@@ -131,10 +139,10 @@ def cmd_extract(args, vprint):
         print("Nothing to do.")
         return
     
-    if args.protein_fasta:
+    if args.sequences:
         require_tools('hmmsearch')
-        with roseate.decorators.spinner('Existing proteins provided. Checking...', enabled=args.verbose):
-            report = roseate.extract.check_proteins(faa=args.protein_fasta,
+        with roseate.decorators.spinner('Checking given sequences', enabled=args.verbose):
+            report = roseate.extract.check_proteins(faa=args.sequences,
                                                     hmm_model=args.hmm,
                                                     min_score=args.bitscore,
                                                     out_dir=out.parent)
@@ -144,38 +152,45 @@ def cmd_extract(args, vprint):
         if n_failed:
             warnings.warn(f'{n_failed} of {len(report)} sequences below bitscore {args.bitscore} '
                         f'against {args.hmm}; kept anyway, but please check {report_out}')
-        records = list(SeqIO.parse(args.protein_fasta, format='fasta'))
+        records = list(SeqIO.parse(args.sequences, format='fasta'))
         # seq id uniqueness check
         if len(set(r.id for r in records)) < len(records):
-            raise UsageError(f'{args.protein_fasta}: sequence IDs (first space-delimited element of header) must be unique')
+            raise UsageError(f'{args.sequences}: sequence IDs (first space-delimited element of header) must be unique')
         for r in records:
             r.seq, r.description = r.seq.replace('*', ''), ''
         # copy proteins
         SeqIO.write(records, out, 'fasta')
         vprint(f'Wrote {len(records)} proteins to {out}')
-        write_run_record(args, Path(args.out), [args.protein_fasta, args.hmm])
+        write_run_record(args, Path(args.out), [args.sequences, args.hmm])
         return
-    # To do: reformat this to better handle errors and avoid intermediates
-    # call proteins and run hmm on proteins
-    require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+    
+    # genomes or protein files, search files for best hits
+    
     try:
-        genomes = roseate.extract.find_genomes(args.genomes)
+        files = roseate.extract.find_genomes(args.genomes or args.protein_files)
     except (FileNotFoundError, ValueError) as e:
         raise UsageError(str(e))
     # write genome files within run output
     genome_dir = out.parent / 'genomes'
-    msg = ' metagenomes' if args.mode == 'meta' else ' genomes'
-    vprint(f'Annotating {len(genomes)}' + msg)
+    if args.genomes:
+        require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+        vprint(f'Annotating {len(files)}' + ' metagenomes' if args.mode == 'meta' else ' genomes')
 
-    with roseate.decorators.spinner('Annotating', enabled=args.verbose):
-        tables = roseate.extract.run_annotation(genomes=args.genomes, 
-                                                hmm_model=args.hmm,
-                                                out_dir=genome_dir,
-                                                mode=args.mode,
-                                                jobs=args.threads)
+        with roseate.decorators.spinner('Annotating', enabled=args.verbose):
+            roseate.extract.run_annotation(genomes=args.genomes, 
+                                                    hmm_model=args.hmm,
+                                                    out_dir=genome_dir,
+                                                    mode=args.mode,
+                                                    jobs=args.threads)
+    else:
+        require_tools('hmmsearch')
+        vprint(f'Searching {len(files)} protein files')
+        with roseate.decorators.spinner('Searching...', enabled=args.verbose):
+            roseate.extract.search_proteins(files, hmm_model=args.hmm, out_dir=genome_dir, jobs=args.threads)
+
 
     # process hmm table to make per-genome protein file
-    with roseate.decorators.spinner('Processing tables',   enabled=args.verbose):
+    with roseate.decorators.spinner('Processing tables', enabled=args.verbose):
         written = roseate.extract.process_hmms(loc=genome_dir, 
                                                protein_name=args.protein_name,
                                                n_proteins=args.n_proteins,
@@ -183,19 +198,15 @@ def cmd_extract(args, vprint):
                                                write_file=True,
                                                overwrite=True)
     vprint(f'Processed {len(written)} tables.')
-    # currently assumes all files are in the same directory,
-    # adk name is hard-coded
-    file = roseate.extract.concat_adks(loc=genome_dir, 
+    roseate.extract.concat_adks(loc=genome_dir, 
                                        out=out, 
                                        protein_name=args.protein_name)
-    with open(file, "rb") as f:
+    with open(out, "rb") as f:
         count = sum(1 for line in f if line.startswith(b">"))
     vprint(f'Wrote {count} proteins to {out}')
 
     # record args
     write_run_record(args, Path(args.out), [genome_dir / 'genome_list.txt', args.hmm])
-
-
 
 @roseate.decorators.verbose_print
 def cmd_align(args, vprint):
@@ -581,14 +592,19 @@ def build_parser():
     # extract
     sub_extract = subs['extract'] = sub.add_parser('extract', help='Extract proteins')
     input_args = sub_extract.add_argument_group("Input arguments")
-    input_args.add_argument('--genomes', type=Path, nargs='+', help="Folder of genomes or samples for prediction")
+    input_args.add_argument('--genomes', type=Path, nargs='+',
+                            help='Nuc FASTA files (assemblies) as folders, list, or wildcard w/ extension e.g. *.fa: genes are called with prodigal')
+    input_args.add_argument('--protein-files', type=Path, nargs='+',
+                            help='Protein FASTA files (assembled, ORF-called) as folders, list, or wildcard w/ extension e.g. *.faa: one per genome or MG sample')
+    input_args.add_argument('--sequences', type=Path,
+                            help='One FASTA of proteins already identified as ADK or other protein: all kept, checked against the HMM')
     input_args.add_argument('--hmm', type=Path, help='HMM for annotating proteins',
                             default=Path(__file__).parents[1] / 'data' / 'PF00406.hmm')
     input_args.add_argument('--n-proteins', type=int, default=1, help='max proteins per genome')
     input_args.add_argument('--bitscore', type=float, default=100, help='minimum bitscore')
     input_args.add_argument('--mode', type=str, choices=['meta', 'single'], default='meta',
                            help='prodigal mode for ORF calling: meta for metagenomes and contings, single for whole genomes')
-    input_args.add_argument('--protein-fasta', type=Path, help="Pre-defined protein sequences used to skip gene calling (skip --genomes)")
+    
     sub_extract.set_defaults(func=cmd_extract)
 
 

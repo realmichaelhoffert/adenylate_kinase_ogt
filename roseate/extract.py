@@ -64,6 +64,7 @@ def search_proteins(fastas, hmm_model, out_dir, jobs=4):
     '''
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / 'genome_list.txt').write_text(''.join(f'{f}\n' for f in fastas))
     tables = []
     for fasta in fastas:
         base = out_dir / genome_name(fasta)
