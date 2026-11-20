@@ -75,7 +75,7 @@ def test_set(ref, test_run=None):
     Default: the archived test set. With test_run: the dataset and embeddings of a roseate run folder.
     '''
     if test_run:
-        dataset = io.reload_pickle(Path(t, test_run=Noneest_run) / RUN_FILES['align']['msa_dataset'])
+        dataset = io.reload_pickle(Path(test_run) / RUN_FILES['align']['msa_dataset'])
         emb = io.load_embeddings(Path(test_run) / RUN_FILES['embed']['embeddings'])
     else:
         dataset = io.reload_pickle(archive(ref, TEST_DATASET))

@@ -32,5 +32,15 @@ roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered
 ```
 roseate fitting-workflow --alignment data/high_qual_alignments/backbone.filtered_only.afa --train-ids data/predictive_models/supporting_data/even_sequence_ids.txt --traits data/high_qual_alignments/temp_data.tsv --scaler reference/v1_preprint/inputs/predictive_models/supporting_data/ogt_scaler.pickle -o models/layer6 --threads 8 --overwrite --verbose --set embed.contexts=models/v1_preprint/even_full_context.npy --set embed.layer=6
 ```
+## Arthrobacter
+`roseate prediction-workflow --genomes ./data/validation_datasets/Arthrobacter/genomes/*.fasta -o examples/Arthrobacter --threads 8 --verbose`
+## Mycobacteria
+`roseate prediction-workflow --genomes ./data/validation_datasets/Arthrobacter/genomes/*.fasta -o examples/Arthrobacter --threads 8 --verbose`
 
+Differences in predictions are reasonable and will be clarified in further testing of embedding properties
 
+## Fig S6 reproduction
+
+`bash reproduce/figS6.sh`
+
+## Metagenomic workflow
