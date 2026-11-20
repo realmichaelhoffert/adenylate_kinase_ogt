@@ -193,12 +193,11 @@ def test_extract_then_align(tmp_path):
     genome = tmp_path / 'genomes' / 'genomeB.fasta'
     genome.parent.mkdir()
     shutil.copy(FIXTURES / 'genomeB.fasta', genome)
-    (tmp_path / 'genomes.txt').write_text(f'{genome}\n')
     backbone = tmp_path / 'backbone.afa'
     SeqIO.write(list(SeqIO.parse(BACKBONE, 'fasta'))[:50], backbone, 'fasta')   # small, so mafft is fast
     out = tmp_path / 'run'
 
-    run('extract', '-o', out, '--genome-list', tmp_path / 'genomes.txt', '--threads', 1)
+    run('extract', '-o', out, '--genomes', genome, '--threads', 1)
     run('align', '-o', out, '--backbone', backbone)
 
     [protein] = SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')
@@ -238,3 +237,62 @@ def test_embed_with_saved_contexts_reproduces_embeddings(tmp_path):
     info = io.reload_pickle(stage(second, 'embed', 'context_info'))
     assert info['contexts_file'] == str(contexts) and 'context_seed' not in info
     assert str(contexts) in records(second)['inputs'].iloc[-1]
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_extract_sequences_keeps_all_and_warns(tmp_path):
+    out = tmp_path / 'run'
+    with pytest.warns(UserWarning, match='1 of 3 sequences'):
+        run('extract', '-o', out, '--sequences', FIXTURES / 'genomeA_proteins.faa')
+    assert [r.id for r in SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')] == \
+           ['contig_1_1', 'contig_1_2', 'contig_2_1']
+    assert pd.read_csv(stage(out, 'extract', 'hmm_check'), sep='\t')['passed'].sum() == 2
+
+@pytest.mark.parametrize('argv', [[], ['--genomes', 'g.fa', '--sequences', 'p.faa'],
+                                  ['--protein-files', 'p.faa', '--sequences', 'p.faa']])
+def test_extract_needs_exactly_one_input(argv, tmp_path):
+    with pytest.raises(SystemExit):
+        run('extract', '-o', tmp_path / 'run', *argv)
+
+def test_align_train_ids_selects_backbone_rows(tmp_path):
+    rows = list(SeqIO.parse(BACKBONE, 'fasta'))[:20]
+    SeqIO.write(rows, tmp_path / 'backbone.afa', 'fasta')
+    picked = [rows[i] for i in (3, 1, 7, 12, 19)]                 # listed out of order on purpose
+    (tmp_path / 'train_ids.txt').write_text('\n'.join(r.id for r in picked) + '\n')
+    out = tmp_path / 'run'
+    run('align', '-o', out, '--backbone', tmp_path / 'backbone.afa', '--train-ids', tmp_path / 'train_ids.txt')
+    dataset = io.reload_pickle(stage(out, 'align', 'msa_dataset'))
+    expected = [rows[i] for i in (1, 3, 7, 12, 19)]                # backbone order
+    assert [(i[0], i[1]) for i in dataset] == [(r.id, str(r.seq)) for r in expected]
+    assert stage(out, 'align', 'alignment').read_text() == (tmp_path / 'backbone.afa').read_text()
+
+@pytest.mark.parametrize('extra, message', [
+    (['--train-ids', 'IDS'], 'are not in'),                          # an ID missing from the backbone
+    (['--train-ids', 'IDS', '--proteins', 'p.faa'], 'ive --proteins (new seqs) or --train-ids'),     # two scenarios at once
+])
+def test_align_train_ids_errors(extra, message, tmp_path, capsys):
+    (tmp_path / 'ids.txt').write_text('not_a_backbone_id\n')
+    extra = [str(tmp_path / 'ids.txt') if e == 'IDS' else e for e in extra]
+    with pytest.raises(SystemExit):
+        run('align', '-o', tmp_path / 'run', '--backbone', BACKBONE, *extra)
+    assert message in capsys.readouterr().err
+
+def test_config_paths_are_relative_to_the_config_file(trained, copy_of, tmp_path, monkeypatch):
+    out = copy_of(trained)
+    configs = tmp_path / 'configs'
+    configs.mkdir()
+    shutil.copy(stage(out, 'fit', 'model'), tmp_path / 'model.pickle')
+    (configs / 'test.yaml').write_text('predict:\n  model: ../model.pickle\n')
+    elsewhere = tmp_path / 'elsewhere'
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)                      # relative to here, ../model.pickle does not exist
+    run('predict', '-o', out, '--config', configs / 'test.yaml', '--overwrite')
+    assert str(tmp_path / 'model.pickle') in records(out)['inputs'].iloc[-1]
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_extract_protein_files_keeps_best_hit_per_file(tmp_path):
+    (tmp_path / 'proteins').mkdir()
+    shutil.copy(FIXTURES / 'genomeA_proteins.faa', tmp_path / 'proteins' / 'sampleA.faa')
+    out = tmp_path / 'run'
+    run('extract', '-o', out, '--protein-files', tmp_path / 'proteins')      # a folder of protein files
+    assert [r.id for r in SeqIO.parse(stage(out, 'extract', 'proteins'), 'fasta')] == \
+           ['contig_2_1|sampleA|adk|bitscore=192.6']

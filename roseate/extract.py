@@ -22,29 +22,110 @@ pfam_table_columns = ['target_name', 'target_accession', 'query_name', 'query_ac
                       'best_domain_e_value', 'best_domain_score', 'best_domain_bias',
                       'exp', 'reg', 'clu', 'ov', 'env', 'dom', 'rep', 'inc', 'description_of_target']
 
-# Todo: add metagenome / isolate flag
-def run_annotation(genome_list, hmm_model, jobs=4, script=ANNOTATION_SCRIPT):
+FASTA_SUFFIXES = ('.fa', '.fna', '.fasta', '.fa.gz', '.fna.gz', '.fasta.gz', '.faa', '.faa.gz')
+
+
+def genome_name(path):
+    '''Sample name of a genome file: its name without .gz and .fasta/.fna/.fa, as in the annotation script.'''
+    name = Path(path).name.removesuffix('.gz')
+    for ext in ('.fasta', '.fna', '.fa', '.faa'):
+        name = name.removesuffix(ext)
+    return name
+
+
+def find_genomes(inputs):
     '''
-    Gene calling (prodigal -p meta) and hmmsearch for every genome in genome_list,
+    Genome FASTA files from files and folders (a folder means every FASTA file directly in it).
+    Checks that every input exists and that sample names (genome_name) are unique.
+    Returns absolute paths.
+    '''
+    genomes = []
+    for item in map(Path, inputs):
+        if item.is_dir():
+            genomes += sorted(p for p in item.iterdir() if p.name.endswith(FASTA_SUFFIXES))
+        elif item.is_file():
+            genomes.append(item)
+        else:
+            raise FileNotFoundError(f'{item} not found')
+    if not genomes:
+        raise FileNotFoundError(f'no FASTA files ({", ".join(FASTA_SUFFIXES)}) found in {", ".join(map(str, inputs))}')
+    names = [genome_name(g) for g in genomes]
+    repeated = sorted({n for n in names if names.count(n) > 1})
+    if repeated:
+        raise ValueError(f'genome file names must be unique after removing extensions; repeated: {repeated[:5]}')
+    return [g.resolve() for g in genomes]
+
+def search_proteins(fastas, hmm_model, out_dir, jobs=4):
+    '''
+    hmmsearch on protein FASTA files (genes already called), one file per genome or sample.
+    Each file is linked (or uncompressed) to out_dir as {genome_name}_proteins.faa (decompressed if .gz) and searched,
+    giving the same files as run_annotation, so process_hmms and concat_adks work unchanged.
+    Returns: a list of the hmmsearch tables.
+    '''
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / 'genome_list.txt').write_text(''.join(f'{f}\n' for f in fastas))
+    tables = []
+    for fasta in fastas:
+        base = out_dir / genome_name(fasta)
+        proteins, table = Path(f'{base}_proteins.faa'), Path(f'{base}_hmmsearch.tbl')
+        if proteins.exists() or proteins.is_symlink():      # from an earlier run, e.g. with --overwrite
+            proteins.unlink()
+        if str(fasta).endswith('.gz'):                      # gzipped: decompress into the run folder
+            with gzip.open(fasta, 'rt') as source, open(proteins, 'w') as copy:
+                shutil.copyfileobj(source, copy)
+        else:                                               # plain: link to the original, no copy
+            proteins.symlink_to(Path(fasta).resolve())
+        subprocess.run(['hmmsearch', '--cpu', str(jobs), '--tblout', str(table), str(hmm_model), str(proteins)],
+                       stdout=subprocess.DEVNULL, check=True)
+        tables.append(table)
+    return tables
+
+def run_annotation(genomes, hmm_model, out_dir, mode='meta', jobs=4, script=ANNOTATION_SCRIPT):
+    '''
+    Gene calling (prodigal -p {mode}) and hmmsearch for every genome in genome_list,
     one genome FASTA path per line (.fa, .fasta, optionally .gz).
     Runs scripts/run_esm_pipeline.sh unchanged; needs seqtk, prodigal, hmmer and GNU parallel.
     Outputs are written next to each genome. 
     Returns: a list of the hmmsearch tables.
     '''
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    genome_list = out_dir / 'genome_list.txt'
+    genome_list.write_text(''.join(f'{g}\n' for g in genomes))
     result = subprocess.run(['bash', str(script), '--genome-list', str(genome_list),
-                             '--hmm-model', str(hmm_model), '--jobs', str(jobs)],
+                             '--hmm-model', str(hmm_model), '--jobs', str(jobs), 
+                             '--mode', str(mode), '--outdir', str(out_dir)],
                             capture_output=True, text=True)
     tables = []
-    for genome in Path(genome_list).read_text().split():
-        base = genome
-        for ext in ['.fasta', '.fa', '.fasta.gz', '.fa.gz']:   # same order as the script
-            base = base[:-len(ext)] if base.endswith(ext) else base
+    for genome in genomes:
+        base = out_dir / genome_name(genome)
         expected = [f'{base}_proteins.faa', f'{base}_hmmsearch.tbl']
         if not all(os.path.exists(f) for f in expected):
             raise RuntimeError(f'annotation failed for {genome}:\n{result.stderr[-2000:]}')
         tables.append(expected[1])
     return tables
 
+def check_proteins(faa, hmm_model, min_score=100, out_dir='.'):
+    '''
+    Checks a set of input proteins by running them against a provided HMM model
+    avoids incorrectly annotated proteins
+    faa: str or path? path to protein fasta
+    hmm_model: str or path to hmm model
+    min_score: minimum score for check (recommend something like PFAM trusted cutoff)
+    '''
+
+    table = Path(out_dir) / 'hmmsearch.tbl'
+    subprocess.run(['hmmsearch', '--tblout', str(table), str(hmm_model), str(faa)],
+                   stdout=subprocess.DEVNULL, check=True)
+    ids = [r.id for r in SeqIO.parse(faa, 'fasta')]
+    try:
+        scores = read_pfam_table_pandas(table).set_index('target_name')['full_score']
+    except ValueError:                       # no hits at all
+        scores = pd.Series(dtype=float)
+    report = pd.DataFrame({'id': ids, 'bitscore': scores.reindex(ids).values})
+    report['passed'] = report['bitscore'] >= min_score
+    return report
 
 def read_pfam_table_pandas(file_path):
     '''
@@ -70,7 +151,7 @@ def process_hmms(loc, protein_name='adk', n_proteins=1, min_score=100, write_fil
 
     written = []
     for count, file in enumerate(hmm_files):
-        print(f'{count+1} tables processed of {len(hmm_files)}', end='\r')
+        # print(f'{count+1} tables processed of {len(hmm_files)}', end='\r')
         try:
             df = read_pfam_table_pandas(file)
         except ValueError:

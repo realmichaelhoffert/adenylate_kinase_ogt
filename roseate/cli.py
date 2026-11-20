@@ -21,10 +21,12 @@ import roseate.decorators
 
 # arguments that must come from the command line or --config
 REQUIRED = {"align":["out", "backbone"],
-            "extract":["out", "genome_list"],
+            "extract":["out"],
             "embed": ["context_dataset", "out"],
             "fit":["out"],
             "predict": ["out"], 
+            "prediction-workflow": ["out"],
+            "fitting-workflow": ["out", "alignment", "train_ids", "traits"],
             
             }
 
@@ -32,7 +34,8 @@ REQUIRED = {"align":["out", "backbone"],
 #   <out>/1_extract/ 2_align/ 3_embed/ 4_fit/ 5_predict/
 # 4_fit always holds the model used by predict, whether fitted here or copied in.
 RUN_FILES = {
-    'extract': {'proteins': '1_extract/proteins.faa'},
+    'extract': {'proteins': '1_extract/proteins.faa',
+                'hmm_check':'1_extract/hmm_check.tsv'},
     'align':   {'alignment': '2_align/protein_to_backbone.afa',
                 'msa_dataset': '2_align/protein_to_backbone.pickle'},
     'embed':   {'contexts': '3_embed/contexts.npy',
@@ -115,72 +118,145 @@ def write_run_record(args, out_dir, inputs):
 @roseate.decorators.verbose_print
 def cmd_extract(args, vprint):
 
+    '''
+    Find the protein of interest. Three kinds of input:
+    roseate extract --genomes FILES [--mode single|meta]   nucleotide FASTAs: call genes, search, keep best hits
+    roseate extract --protein-files FILES                  protein FASTAs: search, keep best hits
+    roseate extract --sequences FASTA                      proteins already identified: check against the HMM, keep all
+    '''
+    from Bio import SeqIO
     import roseate.extract
-    
-    require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+
+    # ensure only 1 input option is recieved    
+    if sum(x is not None for x in (args.genomes, args.protein_files, args.sequences)) != 1:
+        raise UsageError('give exactly one of --genomes, --protein-files and --sequences')
+
+    # main output: protein file
     out = stage_file(args.out, 'extract', 'proteins')
+
     if done([out], args.overwrite):
         warnings.warn(f"extract: specify --overwrite to overwrite existing file {out}")
         print("Nothing to do.")
         return
+    
+    if args.sequences:
+        require_tools('hmmsearch')
+        with roseate.decorators.spinner('Checking given sequences', enabled=args.verbose):
+            report = roseate.extract.check_proteins(faa=args.sequences,
+                                                    hmm_model=args.hmm,
+                                                    min_score=args.bitscore,
+                                                    out_dir=out.parent)
+        report_out = stage_file(args.out, 'extract', 'hmm_check')                                        
+        report.to_csv(report_out, sep='\t', index=False)
+        n_failed = (~report['passed']).sum()
+        if n_failed:
+            warnings.warn(f'{n_failed} of {len(report)} sequences below bitscore {args.bitscore} '
+                        f'against {args.hmm}; kept anyway, but please check {report_out}')
+        records = list(SeqIO.parse(args.sequences, format='fasta'))
+        # seq id uniqueness check
+        if len(set(r.id for r in records)) < len(records):
+            raise UsageError(f'{args.sequences}: sequence IDs (first space-delimited element of header) must be unique')
+        for r in records:
+            r.seq, r.description = r.seq.replace('*', ''), ''
+        # copy proteins
+        SeqIO.write(records, out, 'fasta')
+        vprint(f'Wrote {len(records)} proteins to {out}')
+        write_run_record(args, Path(args.out), [args.sequences, args.hmm])
+        return
+    
+    # genomes or protein files, search files for best hits
+    
+    try:
+        files = roseate.extract.find_genomes(args.genomes or args.protein_files)
+    except (FileNotFoundError, ValueError) as e:
+        raise UsageError(str(e))
+    # write genome files within run output
+    genome_dir = out.parent / 'genomes'
+    if args.genomes:
+        require_tools('prodigal', 'seqtk', 'hmmsearch', 'parallel')
+        vprint(f'Annotating {len(files)}' + ' metagenomes' if args.mode == 'meta' else ' genomes')
 
-    # To do: reformat this to better handle errors and avoid intermediates
-    # call proteins and run hmm on proteins
-    with roseate.decorators.spinner('Annotating', enabled=args.verbose):
-        tables = roseate.extract.run_annotation(genome_list=args.genome_list, 
-                                                hmm_model=args.hmm, 
-                                                jobs=args.threads)
+        with roseate.decorators.spinner('Annotating', enabled=args.verbose):
+            roseate.extract.run_annotation(genomes=args.genomes, 
+                                                    hmm_model=args.hmm,
+                                                    out_dir=genome_dir,
+                                                    mode=args.mode,
+                                                    jobs=args.threads)
+    else:
+        require_tools('hmmsearch')
+        vprint(f'Searching {len(files)} protein files')
+        with roseate.decorators.spinner('Searching...', enabled=args.verbose):
+            roseate.extract.search_proteins(files, hmm_model=args.hmm, out_dir=genome_dir, jobs=args.threads)
+
 
     # process hmm table to make per-genome protein file
-    with roseate.decorators.spinner('Processing tables',   enabled=args.verbose):
-        written = roseate.extract.process_hmms(loc=Path(tables[0]).parent, 
+    with roseate.decorators.spinner('Processing tables', enabled=args.verbose):
+        written = roseate.extract.process_hmms(loc=genome_dir, 
                                                protein_name=args.protein_name,
                                                n_proteins=args.n_proteins,
                                                min_score=args.bitscore,
                                                write_file=True,
                                                overwrite=True)
     vprint(f'Processed {len(written)} tables.')
-    # currently assumes all files are in the same directory,
-    # adk name is hard-coded
-    file = roseate.extract.concat_adks(loc=Path(tables[0]).parent, 
+    roseate.extract.concat_adks(loc=genome_dir, 
                                        out=out, 
                                        protein_name=args.protein_name)
-    with open(file, "rb") as f:
+    with open(out, "rb") as f:
         count = sum(1 for line in f if line.startswith(b">"))
     vprint(f'Wrote {count} proteins to {out}')
 
     # record args
-    write_run_record(args, Path(args.out), [args.genome_list, args.hmm])
-
-
+    write_run_record(args, Path(args.out), [genome_dir / 'genome_list.txt', args.hmm])
 
 @roseate.decorators.verbose_print
 def cmd_align(args, vprint):
+    '''
+    roseate align --backbone B [--proteins P]    prediction: add new proteins P to B with MAFFT
+    roseate align --backbone B --train-ids IDS   training: rows of B listed in IDS, no MAFFT
+    Either way 2_align/protein_to_backbone.afa holds all of B (plus any new proteins).
+    '''
 
-    from roseate import align, io
+    from roseate import align, io, decorators
+    from Bio import SeqIO
     
-    require_tools('mafft')
-    protein_file = input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
-    backbone = args.backbone
+    if args.proteins and args.train_ids:
+        raise UsageError('give --proteins (new seqs) or --train-ids (rows of backbone for training)')
+
+
     out = stage_file(args.out, 'align', 'alignment')
     if done([out], args.overwrite):
         warnings.warn(f"align: specify --overwrite to overwrite existing file {out}")
         print("Nothing to do.")
         return
     
-    # insert sequences into alignment
-    with roseate.decorators.spinner('Aligning to backbone', enabled=args.verbose):
-        aligned = align.add_to_backbone(protein_file, backbone, out)
-        added_ids = align.added_ids(aligned, backbone)
+    if args.train_ids:
+
+        keep = set(Path(args.train_ids).read_text().split())
+        records =  list(SeqIO.parse(args.backbone, 'fasta'))
+        missing = keep - {r.id for r in records}
+        if missing:
+            raise UsageError(f'{len(missing)} IDs in {args.train_ids} are not in {args.backbone}')
+        shutil.copy(args.backbone, out)
+        # train ids used to subset dataset
+        msa_dataset = [i for i in io.construct_msa_dataset(out) if i[0] in keep]
+        vprint(f'Using {len(msa_dataset)} aligned sequences from {args.backbone}')
+        inputs = [args.backbone, args.train_ids]
+    else:
+        require_tools('mafft')
+        protein_file = input_file(args.proteins, args.out, 'extract', 'proteins', '--proteins')
+        # insert sequences into alignment
+        with roseate.decorators.spinner('Aligning to backbone', enabled=args.verbose):
+            aligned = align.add_to_backbone(protein_file, args.backbone, out)
+            added_ids = align.added_ids(aligned, args.backbone)
         vprint(f"Added {len(added_ids)} sequences.")
-    
+        msa_dataset = [i for i in io.construct_msa_dataset(aligned) if i[0] in added_ids]
+        inputs = [protein_file, args.backbone]
+
     # save MSA dataset
-    msa_dataset = [i for i in io.construct_msa_dataset(aligned) if i[0] in added_ids]
-    msa_out = stage_file(args.out, 'align', 'msa_dataset')
-    io.save_pickle(msa_dataset, msa_out)
+    io.save_pickle(msa_dataset, stage_file(args.out, 'align', 'msa_dataset'))
 
     # run record
-    write_run_record(args, Path(args.out), [protein_file, args.backbone])
+    write_run_record(args, Path(args.out), inputs)
 
     
 @roseate.decorators.verbose_print
@@ -193,7 +269,7 @@ def cmd_embed(args, vprint):
     import numpy as np
     import warnings
     from pathlib import Path
-    from roseate import io, context, embed, decorators
+    from roseate import io, context, decorators
 
     embed_out = stage_file(args.out, 'embed', 'embeddings')
     if done([embed_out], args.overwrite):
@@ -201,6 +277,8 @@ def cmd_embed(args, vprint):
         print("Nothing to do.")
         return
     
+    from roseate import embed
+
     # load msa dataset
     msa = input_file(args.embed_dataset, args.out, 'align', 'msa_dataset', '--embed-dataset')
     with roseate.decorators.spinner('Loading MSA dataset', enabled=args.verbose):
@@ -262,7 +340,7 @@ def cmd_embed(args, vprint):
     layer = model.num_layers if args.layer == -1 else args.layer
         
     # generate embeddings
-    print('Embedding:')
+    vprint('Embedding:')
     emb, _, _ = embed.get_embeddings(model=model, 
                               batch_converter=conv, 
                               data_to_embed = embed_dataset,
@@ -424,6 +502,92 @@ def cmd_predict(args, vprint):
     # record what happened
     write_run_record(args, Path(args.out), [model_path, scaler_path, emb_path, msa_path])
 
+# ---------------------------------------------------------------- workflows
+# Each workflow runs its stages in order in one output folder.
+WORKFLOWS = {
+    'prediction-workflow': ['extract', 'align', 'embed', 'fit', 'predict'],   # fit copies the configured model
+    'fitting-workflow':    ['align', 'embed', 'fit'],
+}
+CONFIG_DIR = Path(__file__).parents[1] / 'configs'
+
+def parse_setting(item):
+    '''
+    embed.context_size=16 -> ('embed', 'context_size', '16')
+    '''
+    target, sep, value = item.partition('=')
+    stage, dot, key = target.partition('.')
+    if not (sep and dot) or stage not in RUN_FILES:
+        raise UsageError(f'--set {item}: expected STAGE.OPTION=VALUE with STAGE one of {", ".join(RUN_FILES)}')
+    return stage, key.replace('-', '_'), value
+    
+
+def workflow_inputs(args):
+    '''
+    args for the workflows
+    '''
+    if args.command == 'prediction-workflow':
+        # input kind -> extract arguments: nucleotide or protein files, and how many hits to keep per file
+        if args.genomes:
+            return {'extract': ['--genomes', *args.genomes, '--mode', 'single', '--n-proteins', 1]}
+        if args.metagenomes:
+            return {'extract': ['--genomes', *args.metagenomes, '--mode', 'meta', '--n-proteins', 1000]}
+        if args.genome_proteins:
+            return {'extract': ['--protein-files', *args.genome_proteins, '--n-proteins', 1]}
+        if args.metagenome_proteins:
+            return {'extract': ['--protein-files', *args.metagenome_proteins, '--n-proteins', 1000]}
+        return {'extract': ['--sequences', args.sequences]}
+    dataset = Path(args.out) / RUN_FILES['align']['msa_dataset']
+    return {'align': ['--backbone', args.alignment, '--train-ids', args.train_ids],
+            'embed': ['--context-dataset', dataset, '--exclude-self'],
+            'fit':   ['--traits', args.traits]  + (['--scaler', args.scaler] if args.scaler else [])}
+
+def cmd_workflow(args):
+    '''
+    run a workflow in one output folder
+    each stage runs exactly as though called with roseate [stage] -o OUT --config CONFIG
+    options are:
+    prediction-workflow: predict with the model
+    fitting-workflow: fit a model
+    '''
+    config = args.config or CONFIG_DIR / f'{args.protein}.yaml'
+    if not Path(config).exists():
+        raise UsageError(f'config not found: {config}')
+    inputs = workflow_inputs(args)
+    settings = [parse_setting(item) for item in args.set or []]
+    for stage in WORKFLOWS[args.command]:
+        argv = [stage, '-o', args.out, '--threads', args.threads]
+        if not (args.command == 'fitting-workflow' and stage == 'fit'):
+            argv += ['--config', config]
+        argv += inputs.get(stage, [])
+        argv += [a for s, key, value in settings if s == stage for a in (f"--{key.replace('_', '-')}", value)]
+        argv += ['--verbose'] * args.verbose + ['--overwrite'] * args.overwrite
+        main([str(a) for a in argv])
+    if args.command == 'fitting-workflow':
+        write_model_config(config, args, settings)
+
+def write_model_config(config, args, settings):
+    '''
+    Write <out>/model_config.yaml: the base config with this run's backbone, context dataset,
+    model and scaler, and any embed settings given with --set. Paths are absolute.
+    Use it with: roseate prediction-workflow --config <out>/model_config.yaml ...
+    '''
+    import yaml
+    out = Path(args.out).resolve()
+    _, subs = build_parser()
+    with open(config) as f:
+        stages = [s for s in (yaml.safe_load(f) or {}) if s in RUN_FILES]
+    model_config = {s: load_config_section(config, s, subs[s]) for s in stages}
+    for stage, key, value in settings:
+        if stage == 'embed' and key not in ('contexts', 'exclude_self'):                       # prediction must embed the same way as training
+            model_config.setdefault('embed', {})[key] = yaml.safe_load(value)
+    model_config.setdefault('align', {})['backbone'] = out / RUN_FILES['align']['alignment']
+    model_config.setdefault('embed', {})['context_dataset'] = out / RUN_FILES['align']['msa_dataset']
+    model_config['fit'] = {'model': out / RUN_FILES['fit']['model'], 'scaler': out / RUN_FILES['fit']['scaler']}
+    as_text = {s: {k: str(v) if isinstance(v, Path) else v for k, v in section.items()}
+               for s, section in model_config.items()}
+    with open(out / 'model_config.yaml', 'w') as f:
+        yaml.safe_dump(as_text, f, sort_keys=False)
+
 
 def build_parser():
     p = argparse.ArgumentParser(prog="roseate")
@@ -433,11 +597,19 @@ def build_parser():
     # extract
     sub_extract = subs['extract'] = sub.add_parser('extract', help='Extract proteins')
     input_args = sub_extract.add_argument_group("Input arguments")
-    input_args.add_argument('--genome-list', type=Path, help="Newline delimited file or location of genomes or samples for prediction")
+    input_args.add_argument('--genomes', type=Path, nargs='+',
+                            help='Nuc FASTA files (assemblies) as folders, list, or wildcard w/ extension e.g. *.fa: genes are called with prodigal')
+    input_args.add_argument('--protein-files', type=Path, nargs='+',
+                            help='Protein FASTA files (assembled, ORF-called) as folders, list, or wildcard w/ extension e.g. *.faa: one per genome or MG sample')
+    input_args.add_argument('--sequences', type=Path,
+                            help='One FASTA of proteins already identified as ADK or other protein: all kept, checked against the HMM')
     input_args.add_argument('--hmm', type=Path, help='HMM for annotating proteins',
                             default=Path(__file__).parents[1] / 'data' / 'PF00406.hmm')
     input_args.add_argument('--n-proteins', type=int, default=1, help='max proteins per genome')
     input_args.add_argument('--bitscore', type=float, default=100, help='minimum bitscore')
+    input_args.add_argument('--mode', type=str, choices=['meta', 'single'], default='meta',
+                           help='prodigal mode for ORF calling: meta for metagenomes and contings, single for whole genomes')
+    
     sub_extract.set_defaults(func=cmd_extract)
 
 
@@ -445,9 +617,10 @@ def build_parser():
     sub_align = subs["align"] = sub.add_parser("align", help="Align protein to backbone to make MSA Dataset")
     input_args = sub_align.add_argument_group("Input arguments")
     input_args.add_argument('--proteins',
-                            type=Path, help='Path to file of unaligned proteins')
+                            type=Path, help='Prediction: unaligned proteins to insert into backbone')
     input_args.add_argument('--backbone',
-                            type=Path, help='Path to MSA file of proteins')
+                            type=Path, help="Model's alignment: path to fasta MSA file used for training or addition")
+    input_args.add_argument('--train-ids', type=Path, help='Training (instead of proteins): newline-delimited file of backbone IDs for training')
     sub_align.set_defaults(func=cmd_align)
 
     # embed
@@ -497,6 +670,38 @@ def build_parser():
     sub_pred.add_argument("--per-site", action="store_true", help="Save the (protein_len, n) per-site predictions")
     sub_pred.set_defaults(func=cmd_predict)
 
+        # workflows
+    sub_pw = subs['prediction-workflow'] = sub.add_parser(
+        'prediction-workflow', help='Predict with a fitted model: extract, align, embed, fit (copy), predict')
+    sub_pw.add_argument('protein', nargs='?', default='adk',
+                        help='Model to use: configs/<protein>.yaml (default: adk); ignored with --config')
+    pw_inputs = sub_pw.add_argument_group('Input (exactly one)').add_mutually_exclusive_group(required=True)
+    pw_inputs.add_argument('--genomes', type=Path, nargs='+',
+                           help='Genome FASTA files and/or folders: prodigal single-genome mode, 1 hit per genome')
+    pw_inputs.add_argument('--metagenomes', type=Path, nargs='+',
+                           help='Metagenome assembly FASTA files and/or folders: prodigal metagenome mode, up to 1000 hits per sample')
+    pw_inputs.add_argument('--genome-proteins', type=Path, nargs='+',
+                           help='Protein FASTA files and/or folders, one per genome (genes already called): 1 hit per genome')
+    pw_inputs.add_argument('--metagenome-proteins', type=Path, nargs='+',
+                           help='Protein FASTA files and/or folders, one per sample (genes already called): up to 1000 hits per sample')
+    pw_inputs.add_argument('--sequences', type=Path,
+                           help='One FASTA of proteins already identified: all kept, checked against the HMM')
+
+    sub_fw = subs['fitting-workflow'] = sub.add_parser(
+        'fitting-workflow', help='Fit a model on rows of an alignment: align, embed, fit; writes model_config.yaml')
+    sub_fw.add_argument('protein', nargs='?', default='adk',
+                        help='Base config for embedding settings and the HMM: configs/<protein>.yaml; ignored with --config')
+    fw_inputs = sub_fw.add_argument_group('Inputs')
+    fw_inputs.add_argument('--alignment', type=Path, help='Backbone alignment the model is trained on')
+    fw_inputs.add_argument('--train-ids', type=Path, help='Backbone rows to train on, one ID per line')
+    fw_inputs.add_argument('--traits', type=Path, help='Trait table for the training rows')
+    fw_inputs.add_argument('--scaler', type=Path, help='Optional trait scaler, e.g. to reproduce a published model')
+
+    for s in (sub_pw, sub_fw):
+        s.add_argument('--set', action='append', metavar='STAGE.OPTION=VALUE',
+                       help='Option for one stage, e.g. --set embed.context_size=16 (repeatable)')
+        s.set_defaults(func=cmd_workflow)
+
     # extract, align, embed, fit, run, reproduce: same pattern, one cmd_* each
     for s in subs.values():
         s.add_argument('-o', '--out', type=Path, help='Output location')
@@ -508,17 +713,29 @@ def build_parser():
         s.add_argument('--threads', type=int, help='Number of threads', default=4)
     return p, subs
 
+def load_config_section(config : Path, command : str, subparser):
+    '''
+    load defaults for a command from a subsection of a config.yaml file
+    paths resolved against the config's folder, allowing any directory
+    '''
+    import yaml
+    with open(config) as f:
+        section = (yaml.safe_load(f) or {}).get(command) or {}
+    section = {k.replace('-', '_'): v for k,v in section.items()}
+    path_args = {a.dest for a in subparser._actions if a.type is Path}
+    for key, value in section.items():
+        if key in path_args and value is not None and not Path(value).is_absolute():
+            section[key] = (Path(config).resolve().parent / value).resolve()
+    return section
 
 def main(argv=None):
     parser, subs = build_parser()
     args = parser.parse_args(argv)
     # allow some args to be computed from config
     if args.config:
-        import yaml
-        with open(args.config) as f:
-            section = (yaml.safe_load(f) or {}).get(args.command, {})
-        subs[args.command].set_defaults(**{k.replace("-", "_"): v for k, v in section.items()})
-        args = parser.parse_args(argv)   # second pass: config values are defaults, flags override
+        subs[args.command].set_defaults(**load_config_section(args.config, args.command, subs[args.command]))
+        args = parser.parse_args(argv)   # second pass: config values are defaults, flags override  
+
     # catch missed args
     for name in REQUIRED.get(args.command, []):
         if getattr(args, name) is None:

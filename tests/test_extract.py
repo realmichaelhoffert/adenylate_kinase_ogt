@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from Bio import SeqIO
+import numpy as np
 
 from roseate import extract
 from tests.archive import path
@@ -86,13 +87,11 @@ def test_concat_adks_sorted_order(tmp_path):
 @pytest.mark.skipif(not all(shutil.which(t) for t in ['seqtk', 'prodigal', 'hmmsearch', 'parallel']),
                     reason='needs seqtk, prodigal, hmmer and GNU parallel')
 def test_annotation_to_adks_faa(tmp_path):
-    genome = tmp_path / 'genomeB.fasta'
-    shutil.copy(DATA / 'genomeB.fasta', genome)
-    (tmp_path / 'genome_list.txt').write_text(f'{genome}\n')
-
-    tables = extract.run_annotation(tmp_path / 'genome_list.txt', HMM, jobs=1)
-    written = extract.process_hmms(tmp_path)
-    adks = read(extract.concat_adks(tmp_path, tmp_path / 'adks.faa'))
+    out_dir = tmp_path / 'annotation'
+    tables = extract.run_annotation(extract.find_genomes([DATA / 'genomeB.fasta']), HMM, out_dir, jobs=1)
+    assert tables == [str(out_dir / 'genomeB_hmmsearch.tbl')]
+    extract.process_hmms(out_dir)
+    adks = read(extract.concat_adks(out_dir, tmp_path / 'adks.faa'))
     assert len(adks) == 1 and HEADER.match(adks[0].id)
     assert 'genomeB' == adks[0].id.split('|')[1]
     assert str(adks[0].seq) == str(read(DATA / 'genomeA_proteins.faa')[0].seq).rstrip('*')
@@ -104,3 +103,40 @@ def test_archived_new_data_headers_match_v1_format():
     backbone_ids = {r.id for r in SeqIO.parse(path('inputs/high_qual_alignments/backbone.afa'), 'fasta')}
     added = [r.id for r in SeqIO.parse(aligned, 'fasta') if r.id not in backbone_ids]
     assert added and all(V1_HEADER.match(i) for i in added), added[:3]
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_check_proteins_scores_each_sequence(tmp_path):
+    report = extract.check_proteins(DATA / 'genomeA_proteins.faa', HMM, min_score=180, out_dir=tmp_path)
+    assert list(report['id']) == ['contig_1_1', 'contig_1_2', 'contig_2_1']
+    assert list(report['passed']) == [False, False, True]      # 175.4, no hit, 192.6
+    assert np.isnan(report['bitscore'][1])
+
+def test_genome_name_strips_fasta_and_gz_extensions():
+    for name in ['x.fa', 'x.fna', 'x.fasta', 'x.fa.gz', 'x.fna.gz', 'x.fasta.gz', 'dir/x.fna', 'x.faa', 'x.faa.gz']:
+        assert extract.genome_name(name) == 'x'
+
+def test_find_genomes_from_files_and_folders(tmp_path):
+    (tmp_path / 'folder').mkdir()
+    for name in ['folder/b.fna', 'folder/c.fa.gz', 'folder/notes.txt', 'a.fasta']:
+        (tmp_path / name).write_text('>x\nACGT\n')
+    found = extract.find_genomes([tmp_path / 'a.fasta', tmp_path / 'folder'])
+    assert [p.name for p in found] == ['a.fasta', 'b.fna', 'c.fa.gz'] and all(p.is_absolute() for p in found)
+
+@pytest.mark.parametrize('names, error', [(['a.fa', 'missing.fa'], FileNotFoundError),
+                                          (['a.fa', 'sub/a.fna'], ValueError)])     # same sample name twice
+def test_find_genomes_errors(names, error, tmp_path):
+    (tmp_path / 'sub').mkdir()
+    for name in ['a.fa', 'sub/a.fna']:
+        (tmp_path / name).write_text('>x\nACGT\n')
+    with pytest.raises(error):
+        extract.find_genomes([tmp_path / n for n in names])
+
+@pytest.mark.skipif(not shutil.which('hmmsearch'), reason='needs hmmer')
+def test_search_proteins_feeds_process_hmms(tmp_path):
+    shutil.copy(DATA / 'genomeA_proteins.faa', tmp_path / 'sampleA.faa')
+    out_dir = tmp_path / 'out'
+    tables = extract.search_proteins(extract.find_genomes([tmp_path / 'sampleA.faa']), HMM, out_dir, jobs=1)
+    assert tables == [out_dir / 'sampleA_hmmsearch.tbl']
+    extract.process_hmms(out_dir, n_proteins=1)
+    [best] = read(out_dir / 'sampleA_adk.faa')
+    assert best.id == 'contig_2_1|sampleA|adk|bitscore=192.6'

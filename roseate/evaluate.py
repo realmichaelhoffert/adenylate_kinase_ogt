@@ -10,6 +10,8 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
+from roseate import io
+
 TAXONOMY_LEVELS = ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 
 
@@ -193,3 +195,45 @@ def legacy_pcv_models(svr_model, rf_model, enet_params):
         'GPR': _fit_gpr,
         'NN': _fit_nn,
     }
+
+# ---------------------------------------------------------------- model comparison
+def compare_models(new, reference, atol=1e-8, ignore_params=('n_jobs', 'precompute')):
+    '''
+    Differences between two roseate model dicts, e.g. a refit and the archived preprint model.
+    Compares the sites, each site's ElasticNetCV settings and fitted values, each site's scaler,
+    and the stored test predictions and labels. Numbers match if they differ by at most atol.
+    ignore_params: ElasticNetCV settings that do not affect the fit, or that changed on purpose.
+    Returns a list of messages; an empty list means the models match.
+    '''
+    diffs = []
+
+    def close(name, a, b):
+        a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+        if a.shape != b.shape:
+            diffs.append(f'{name}: shape {a.shape} != {b.shape}')
+        elif a.size and np.max(np.abs(a - b)) > atol:
+            diffs.append(f'{name}: max abs diff {np.max(np.abs(a - b)):.3g} > {atol}')
+
+    sites = sorted(new['best_model'])
+    if sorted(new['best_model']) != sites:
+        return [f"sites differ: {len(new['best_model'])} in new, {len(sites)} in reference"]
+
+    for site in sites:
+        a, b = new['best_model'][site], reference['best_model'][site]
+        params_a, params_b = a.get_params(), b.get_params()
+        for key in sorted((set(params_a) | set(params_b)) - set(ignore_params)):
+            if params_a.get(key) != params_b.get(key):
+                diffs.append(f'site {site} {key}: {params_a.get(key)!r} != {params_b.get(key)!r}')
+        for attr in ['alpha_', 'l1_ratio_', 'coef_', 'intercept_']:
+            close(f'site {site} {attr}', getattr(a, attr), getattr(b, attr))
+        for attr in ['mean_', 'scale_']:
+            close(f'site {site} scaler {attr}', getattr(new['scalers'][site], attr),
+                  getattr(reference['scalers'][site], attr))
+
+    for key in ['full_predictions', 'predictions', 'true_values']:
+        close(key, new[key], reference[key])
+    if list(new['true_labels']) != list(reference['true_labels']):
+        diffs.append('true_labels differ')
+    if tuple(new['metadata']['input_shape']) != tuple(reference['metadata']['input_shape']):
+        diffs.append(f"input_shape {new['metadata']['input_shape']} != {reference['metadata']['input_shape']}")
+    return diffs

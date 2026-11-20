@@ -12,8 +12,10 @@ echo "Running from: $SCRIPT_DIR"
 echo "Repo root: $REPO_ROOT"
 
 # Default values
+MODE="meta"
 GENOME_LIST=""
 HMM_MODEL=""
+OUTDIR="."
 
 JOBS=4  # Default parallel jobs
 
@@ -22,6 +24,7 @@ usage() {
     echo "Usage: $0 --genome-list FILE --hmm-model FILE [--jobs N]"
     echo ""
     echo "  --genome-list FILE   File with one genome FASTA path per line (.fa, .fasta, .gz allowed)"
+    echo "  --mode MODE         prodigal mode: meta (default) or single"
     echo "  --hmm-model FILE   File of hmm model to run against genomes"
     echo "  --jobs N             Number of parallel jobs (default: 4)"
     exit 1
@@ -32,6 +35,14 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --genome-list)
             GENOME_LIST="$2"
+            shift 2
+            ;;
+        --outdir)
+            OUTDIR="$2"
+            shift 2
+            ;;
+        --mode)
+            MODE="$2"
             shift 2
             ;;
         --jobs)
@@ -67,21 +78,27 @@ if [[ -n "$HMM_MODEL" && ! -f "$HMM_MODEL" ]]; then
     exit 1
 fi
 
+if [[ "$MODE" != "meta" && "$MODE" != "single" ]]; then
+    echo "Error: --mode must be 'meta' or 'single', not '$MODE'."
+    exit 1
+fi
+
 # Function to run prodigal on one genome
 run_prodigal() {
     genome="$1"
 
-    # Strip directory and extensions: .fasta, .fa, .fasta.gz, .fa.gz
-    # filename=$(basename "$genome")
-    base="${genome%.fasta}"
+    # Outputs go to OUTDIR, named after the file without .gz and .fasta/.fna/.fa
+    filename=$(basename "$genome")
+    base="${filename%.gz}"
+    base="${base%.fasta}"
+    base="${base%.fna}"
     base="${base%.fa}"
-    base="${base%.fasta.gz}"
-    base="${base%.fa.gz}"
+    base="$OUTDIR/$base"
 
     # Support gzipped files transparently
     if [[ "$genome" == *.gz ]]; then
-        zcat "$genome" > "/tmp/${base}_temp.fa"
-        genome="/tmp/${base}_temp.fa"
+        zcat "$genome" > "${base}_temp.fa"
+        genome="${base}_temp.fa"
     fi
 
     seqtk seq -A -L 300 "$genome" > "${base}_filtered.fasta"
@@ -90,7 +107,7 @@ run_prodigal() {
              -a "${base}_proteins.faa" \
              -d "${base}_proteins.fna" \
              -o "${base}_prodigal_output.gbk" \
-             -p meta
+             -p "$MODE"
 
     # Optionally run hmmsearch
     if [[ -n "$HMM_MODEL" ]]; then
@@ -98,11 +115,14 @@ run_prodigal() {
     fi
 
     # Cleanup
-    if [[ -f "/tmp/${base}_temp.fa" ]]; then rm "/tmp/${base}_temp.fa"; fi
+    if [[ -f "${base}_temp.fa" ]]; then rm "${base}_temp.fa"; fi
 }
 
 export -f run_prodigal
 export HMM_MODEL
+export OUTDIR
+mkdir -p "OUTDIR"
+export MODE
 
 # Run in parallel
 parallel -j "$JOBS" run_prodigal :::: "$GENOME_LIST"
