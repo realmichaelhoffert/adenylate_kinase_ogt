@@ -1,5 +1,6 @@
 .DS_Store
 *models*
+/runs*
 /tests/layer1*
 /tests/layer6*
 /tests/Shah2024*
