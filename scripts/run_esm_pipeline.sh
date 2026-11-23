@@ -107,6 +107,7 @@ run_prodigal() {
              -a "${base}_proteins.faa" \
              -d "${base}_proteins.fna" \
              -o "${base}_prodigal_output.gbk" \
+             -c \
              -p "$MODE"
 
     # Optionally run hmmsearch
