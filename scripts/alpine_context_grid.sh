@@ -19,7 +19,7 @@
 set -eo pipefail          # no -u: CURC's module and conda scripts reference unset variables
 
 # ---------------------------------------------------------------- settings (edit these)
-ACCOUNT="miho1832"                                         # e.g. ucbNNN_asc1; empty = your default account
+ACCOUNT=""                                         # e.g. ucbNNN_asc1; empty = your default account
 REPO_URL=https://github.com/realmichaelhoffert/adenylate_kinase_ogt.git
 BRANCH=main
 WORK=/projects/$USER/roseate                       # repo clone, conda environment, model weights
