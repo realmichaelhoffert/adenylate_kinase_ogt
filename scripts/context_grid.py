@@ -83,7 +83,7 @@ def commands(args):
         for seed in range(1, args.prediction_seeds + 1):
             predict = (f'roseate prediction-workflow --config {q(args.main_config)} --sequences {q(test)} '
                   f'--set embed.context_seed={seed} {threads} -o {q(runs / "seeds" / f"s{seed:02d}")}')
-            print(f'{timed(predict, run / "runtime_predict.txt")}')
+            print(f'{timed(cmd, runs / "seeds" / f"s{seed:02d}" / "runtime.txt")}')
 
 
 # ---------------------------------------------------------------- summary
@@ -147,7 +147,7 @@ def summarize(args):
         rows.append({'run': run.name, 'depth': depth, 'seed': seed, **score(pred, traits),
                      'fit_minutes': fit_s / 60, 'predict_minutes': predict_s / 60,
                      'peak_memory_gb': max(fit_gb, predict_gb)})
-                     
+
     grid = pd.DataFrame(rows)
     if not grid.empty:
         grid.to_csv(out / 'grid_runs.tsv', sep='\t', index=False)
