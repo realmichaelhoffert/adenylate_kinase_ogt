@@ -136,7 +136,7 @@ def summarize(args):
 
     # grid: one score per finished run
     rows = []
-    for run in sorted((args.runs / grid).glob('d*_s*')):
+    for run in sorted((args.runs / 'grid').glob('d*_s*')):
         pred = predictions(run / 'predict')
         if pred is None:
             print(f'not finished: {run.name}')
