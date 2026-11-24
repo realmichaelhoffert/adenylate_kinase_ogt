@@ -173,7 +173,7 @@ submit() {
     mkdir -p "$LOGS"
     local n common setup_id embed_id fit_id
     n=$(grid_runs | wc -l)
-    common="$(account) --parsable --ntasks=1"
+    common="$(account) --parsable --nodes=1 --ntasks=1"
     setup_id=$(sbatch $common --job-name=cg_setup --output=$LOGS/%x_%j.out --partition=acpu --qos=cpu-normal \
         --cpus-per-task=4 --mem=15G --time=02:00:00 "$0" setup)
     embed_id=$(sbatch $common --job-name=cg_embed --output=$LOGS/%x_%A_%a.out --dependency=afterok:$setup_id \
@@ -195,7 +195,7 @@ submit_test() {
     LOGS=$RUNS/logs
     mkdir -p "$LOGS"
     local common setup_id
-    common="$(account) --parsable --ntasks=1 --export=ALL,TEST=1 --output=$LOGS/%x_%j.out"
+    common="$(account) --parsable --nodes=1 --ntasks=1 --export=ALL,TEST=1 --output=$LOGS/%x_%j.out"
     setup_id=$(sbatch $common --job-name=cg_test_setup --partition=acpu --qos=cpu-normal --cpus-per-task=4 \
         --mem=15G --time=02:00:00 "$0" setup)
     sbatch $common --job-name=cg_test_run --dependency=afterok:$setup_id --partition=acpu --qos=cpu-testing \
