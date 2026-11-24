@@ -23,20 +23,23 @@ from tqdm import tqdm
 
 MSADataset = list[tuple]
 
-def load_plm():
+def load_plm(device=None):
     '''
     Load ESM-based PLM 
 
     Note: need to allow model swapping?
     '''
+    # get device if no device option provided
+    import torch
     # load ESM model
+    device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
     esm_msa_model, alphabet = esm.pretrained.esm_msa1b_t12_100M_UR50S()
     conv = alphabet.get_batch_converter()
     # turn off gradients
     for name, param in esm_msa_model.named_parameters():
         param.requires_grad = False
 
-    return esm_msa_model, alphabet, conv
+    return esm_msa_model.to(device), alphabet, conv
 
 def get_embeddings(model : esm.model.msa_transformer.MSATransformer, 
                    batch_converter : esm.data.MSABatchConverter, 
@@ -66,6 +69,7 @@ def get_embeddings(model : esm.model.msa_transformer.MSATransformer,
             context = [(context_dataset[c][0], context_dataset[c][1]) for c in context_inds[ind]]
             msa = [(item[0], item[1])] + context
             _, _, tokens = batch_converter(msa)
+            tokens = tokens.to(next(model.parameters()).device)
             contexts.append(context)
             
             # Extract Layer 12 Mean-Pooled embedding
