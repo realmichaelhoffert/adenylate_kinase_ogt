@@ -83,7 +83,7 @@ def commands(args):
         for seed in range(1, args.prediction_seeds + 1):
             predict = (f'roseate prediction-workflow --config {q(args.main_config)} --sequences {q(test)} '
                   f'--set embed.context_seed={seed} {threads} -o {q(runs / "seeds" / f"s{seed:02d}")}')
-            print(f'{timed(cmd, runs / "seeds" / f"s{seed:02d}" / "runtime.txt")}')
+            print(f'{timed(predict, runs / "seeds" / f"s{seed:02d}" / "runtime.txt")}')
 
 
 # ---------------------------------------------------------------- summary
@@ -136,7 +136,7 @@ def summarize(args):
 
     # grid: one score per finished run
     rows = []
-    for run in sorted((args.runs).glob('d*_s*')):
+    for run in sorted((args.runs / 'grid').glob('d*_s*')):
         pred = predictions(run / 'predict')
         if pred is None:
             print(f'not finished: {run.name}')
