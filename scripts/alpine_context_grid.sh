@@ -32,9 +32,9 @@ TRAITS=$INPUTS/temp_data.tsv
 SEQUENCES=$INPUTS/20240122_all_adks_filtered.faa   # unaligned; contains the test sequences
 TEST_IDS=$INPUTS/corkrey_sequence_ids.txt
 
-DEPTHS="0 2 4 8 16 32 64 128 256 512"
+DEPTHS="0 2 4 8 16 32 64 128 256"
 SEEDS=10                                            # seeds per depth ...
-SEEDS_AT_DEPTH_8=5                                 # ... and at depth 8 (used for component stability)
+SEEDS_AT_DEPTH_8=10                                 # ... and at depth 8 (used for component stability)
 GPU_TYPE=a100-40gb
 MAX_GPUS=6                                         # gpu-normal: at most 6 a100-40gb per user at once
 EMBED_CPUS=8
@@ -149,6 +149,11 @@ embed_task() {  # embed_task <array index>: align and embed the training rows (G
         roseate align -o '$RUN/fit' --config '$CONFIG' --backbone '$BACKBONE' --train-ids '$(inputs)' -v &&
         roseate embed -o '$RUN/fit' --config '$CONFIG' --context-dataset '$RUN/fit/2_align/protein_to_backbone.pickle' \
             --exclude-self --context-size $DEPTH --context-seed $SEED --threads ${SLURM_CPUS_PER_TASK:-4} -v"
+    timed "$RUN/runtime_embed_test.txt" bash -c "
+        roseate extract -o '$RUN/predict' --config '$CONFIG' --sequences '$TEST_FASTA' -v &&
+        roseate align -o '$RUN/predict' --config '$CONFIG' --backbone '$RUN/fit/2_align/protein_to_backbone.afa' -v &&
+        roseate embed -o '$RUN/predict' --config '$CONFIG' --context-dataset '$RUN/fit/2_align/protein_to_backbone.pickle' \
+            --context-size $DEPTH --context-seed $SEED --threads ${SLURM_CPUS_PER_TASK:-4} -v"
 }
 
 fit_task() {  # fit_task <array index>: fit (align and embed are reused), then predict the test set
@@ -179,7 +184,7 @@ submit() {
     embed_id=$(sbatch $common --job-name=cg_embed --output=$LOGS/%x_%A_%a.out --dependency=afterok:$setup_id \
         --array=0-$((n - 1))%$MAX_GPUS \
         --partition=aa100 --qos=gpu-normal --gres=gpu:$GPU_TYPE:1 --cpus-per-task=$EMBED_CPUS --mem=30G \
-        --time=03:00:00 "$0" embed)
+        --time=06:00:00 "$0" embed)
     fit_id=$(sbatch $common --job-name=cg_fit --output=$LOGS/%x_%A_%a.out --dependency=aftercorr:$embed_id \
         --array=0-$((n - 1)) \
         --partition=acpu --qos=cpu-normal --cpus-per-task=$FIT_CPUS --mem=60G --time=12:00:00 "$0" fit)

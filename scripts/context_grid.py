@@ -83,7 +83,7 @@ def commands(args):
         for seed in range(1, args.prediction_seeds + 1):
             predict = (f'roseate prediction-workflow --config {q(args.main_config)} --sequences {q(test)} '
                   f'--set embed.context_seed={seed} {threads} -o {q(runs / "seeds" / f"s{seed:02d}")}')
-            print(f'{timed(cmd, runs / "seeds" / f"s{seed:02d}" / "runtime.txt")}')
+            print(f'{timed(predict, runs / "seeds" / f"s{seed:02d}" / "runtime.txt")}')
 
 
 # ---------------------------------------------------------------- summary
