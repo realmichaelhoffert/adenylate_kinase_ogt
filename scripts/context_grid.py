@@ -36,9 +36,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DEPTHS = [0, 2, 4, 8, 16, 32]
-SEEDS = 3
-SEEDS_AT_MAIN_DEPTH = 5
+DEPTHS = [0, 2, 4, 8, 16, 32, 64, 128]
+SEEDS = 10
+SEEDS_AT_MAIN_DEPTH = 10
 MAIN_DEPTH = 8
 PREDICTION_SEEDS = 10
 
@@ -77,7 +77,7 @@ def commands(args):
               f'--traits {q(args.traits)} {settings} {threads} -v -o {q(run / "fit")}')
         predict = (f'roseate prediction-workflow --config {q(run / "fit" / "model_config.yaml")} '
               f'--sequences {q(test)} {threads} -o {q(run / "predict")} '
-              f'--verbose --overwrite')
+              f'--verbose')
         print(f'{timed(fit, run / "runtime_fit.txt")} && {timed(predict, run / "runtime_predict.txt")}')
     if args.main_config:
         for seed in range(1, args.prediction_seeds + 1):
@@ -101,18 +101,25 @@ def score(pred, traits):
 
 
 def component_stability(model_files, k):
-    '''Per site: mean pairwise Jaccard overlap of the k largest |coefficients| across fits.'''
+    '''
+    Per site, averaged over pairs of fits:
+      jaccard   overlap of the k largest |coefficients|
+      spearman  rank correlation of the full coefficient vectors (signs included)
+    '''
     import pickle
-    tops = []
-    for f in model_files:
-        model = pickle.load(open(f, 'rb'))['best_model']
-        tops.append({site: set(np.argsort(-np.abs(m.coef_))[:k]) for site, m in model.items()})
-    sites = sorted(tops[0])
-    n_dims = len(next(iter(pickle.load(open(model_files[0], 'rb'))['best_model'].values())).coef_)
+    from scipy.stats import spearmanr
+    coefs = [{site: m.coef_ for site, m in pickle.load(open(f, 'rb'))['best_model'].items()} for f in model_files]
+    n_dims = len(next(iter(coefs[0].values())))
     rows = []
-    for site in sites:
-        pairs = [len(a[site] & b[site]) / len(a[site] | b[site]) for a, b in itertools.combinations(tops, 2)]
-        rows.append({'site': site, 'jaccard': np.mean(pairs)})
+    for site in sorted(coefs[0]):
+        jaccard, spearman = [], []
+        for a, b in itertools.combinations(coefs, 2):
+            top_a, top_b = set(np.argsort(-np.abs(a[site]))[:k]), set(np.argsort(-np.abs(b[site]))[:k])
+            jaccard.append(len(top_a & top_b) / len(top_a | top_b))
+            if a[site].any() and b[site].any():                 # all-zero vectors (fully penalized site) have no ranks
+                spearman.append(spearmanr(a[site], b[site])[0])
+        rows.append({'site': site, 'jaccard': np.mean(jaccard),
+                     'spearman': np.mean(spearman) if spearman else np.nan})
     return pd.DataFrame(rows), k / (2 * n_dims - k)
 
 
@@ -177,6 +184,8 @@ def summarize(args):
             rows.append(stability.assign(depth=depth, fits=len(fits), chance=chance))
             print(f'component stability, depth {depth} ({len(fits)} fits): mean Jaccard of the top '
                   f'{args.top_k} coefficients per site {stability["jaccard"].mean():.3f} (chance {chance:.3f})')
+            print(f'component stability, depth {depth} ({len(fits)} fits): mean rank correlation of the top '
+                  f'{args.top_k} coefficients per site {stability["spearman"].mean():.3f} (chance 0)')
     if rows:
         pd.concat(rows).to_csv(out / 'component_stability.tsv', sep='\t', index=False)
 
