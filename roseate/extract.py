@@ -11,6 +11,8 @@ import glob
 import os
 import subprocess
 from pathlib import Path
+import gzip
+import shutil
 
 import pandas as pd
 from Bio import SeqIO
